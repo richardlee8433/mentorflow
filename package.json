@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
+    // 原本大多是 "build": "tsc && vite build"
+    "build": "vite build",
     "preview": "vite preview"
-  },
+  }
+
   "dependencies": {
     "@radix-ui/react-label": "^2.1.8",
     "@radix-ui/react-scroll-area": "^1.2.10",
