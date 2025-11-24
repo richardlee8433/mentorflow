@@ -29,6 +29,11 @@ from openai import OpenAI
 
 from fastapi import UploadFile, HTTPException
 
+from pydantic import BaseModel
+
+# 全域 RAG 開關（預設啟用）
+RAG_ENABLED: bool = True
+
 
 # ==========================
 # 路徑 & 基本設定
@@ -190,6 +195,25 @@ def search_chunks(
 
     scored.sort(key=lambda pair: pair[1], reverse=True)
     return scored[:top_k]
+
+class RagToggleRequest(BaseModel):
+    enabled: bool
+
+
+def get_rag_status() -> dict:
+    """
+    回傳目前 RAG 開關狀態，給 /admin/toggle-rag 用。
+    """
+    return {"rag_enabled": RAG_ENABLED}
+
+
+def set_rag_enabled(enabled: bool) -> dict:
+    """
+    設定 RAG 是否啟用，並回傳最新狀態。
+    """
+    global RAG_ENABLED
+    RAG_ENABLED = bool(enabled)
+    return {"rag_enabled": RAG_ENABLED}
 
 
 def retrieve_relevant_chunks(
