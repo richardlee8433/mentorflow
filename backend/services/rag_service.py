@@ -267,6 +267,31 @@ def retrieve_relevant_chunks(
 
     return formatted
 
+from typing import Any, Dict, List, Optional, Tuple  # ← 確保有 Any
+
+# ...現有程式...
+
+def get_documents_summary() -> List[Dict[str, Any]]:
+    """
+    Aggregate chunks by doc_id so the admin UI can show
+    which documents are in the current vector store.
+    """
+    summary: Dict[str, int] = {}
+    for item in _VECTOR_STORE:
+        doc_id = item.metadata.get("doc_id", "unknown")
+        summary[doc_id] = summary.get(doc_id, 0) + 1
+
+    documents: List[Dict[str, Any]] = []
+    for doc_id, count in summary.items():
+        documents.append(
+            {
+                "doc_id": doc_id,
+                "filename": doc_id,
+                "num_chunks": count,
+            }
+        )
+    return documents
+
 
 # ==========================
 # 上傳 / 建立知識庫
