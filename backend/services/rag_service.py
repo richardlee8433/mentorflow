@@ -1,321 +1,193 @@
 """
-RAG helpers for MentorFlow v0.7 (MVP).
+RAG (Retrieval-Augmented Generation) helper utilities.
 
-Responsibilities:
-- Chunk raw text into 300–500 character segments (with optional overlap)
-- Generate embeddings for chunks using OpenAI text-embedding-3-small
-- Store chunk embeddings + metadata in the global vector store
-- Provide a simple search interface for retrieving Top-K relevant chunks
-  for a given question
+This module is responsible for:
 
-This module does NOT deal with FastAPI routes directly.
-It is intended to be used by app.py (or admin routes) and the
-RAG answer generation logic.
+1. Loading and persisting a very small local "vector store"
+   under backend/uploaded_docs/vector_store.json
+2. Ingesting TXT / PDF files into that store
+3. Serving higher-level helpers that the FastAPI app can call:
+   - build_kb_from_txt_file(...)
+   - build_kb_from_pdf_file(...)
+   - retrieve_relevant_chunks(...)
+
+設計目標：
+- 盡量簡單、無外部 DB，相容 Render / Netlify demo
+- 若沒有任何文件上傳，retrieve_relevant_chunks() 會回傳 []
 """
 
 from __future__ import annotations
 
+import json
+import math
 import os
+from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from openai import OpenAI
 
-from services.vector_store import (
-    add_chunk_embeddings,
-    search_chunks,
-)
+# ==========================
+# 路徑 & 基本設定
+# ==========================
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+UPLOAD_DIR = BASE_DIR / "uploaded_docs"
+VECTOR_STORE_PATH = UPLOAD_DIR / "vector_store.json"
+
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
+
+_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
-# =========================
-# Settings & OpenAI client
-# =========================
-
-EMBEDDING_MODEL = "text-embedding-3-small"
-
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# ==========================
+# 資料結構
+# ==========================
 
 
-# =========================
-# Chunking helpers
-# =========================
+@dataclass
+class StoredChunk:
+    """Single chunk stored in the local vector store."""
 
-def chunk_text(
-    text: str,
-    max_chunk_chars: int = 400,
-    overlap_chars: int = 50,
-) -> List[Tuple[str, int, int]]:
+    id: str
+    text: str
+    embedding: List[float]
+    metadata: Dict[str, Any]
+
+
+# in-memory vector store (loaded at import time)
+_VECTOR_STORE: List[StoredChunk] = []
+
+
+# ==========================
+# 基礎工具
+# ==========================
+
+
+def _load_vector_store() -> None:
+    """Load vector store from disk into memory."""
+    global _VECTOR_STORE
+
+    if not VECTOR_STORE_PATH.exists():
+        _VECTOR_STORE = []
+        return
+
+    try:
+        raw = json.loads(VECTOR_STORE_PATH.read_text(encoding="utf-8"))
+        _VECTOR_STORE = [
+            StoredChunk(
+                id=item["id"],
+                text=item["text"],
+                embedding=item["embedding"],
+                metadata=item.get("metadata", {}),
+            )
+            for item in raw
+        ]
+    except Exception:
+        # 若檔案壞掉，直接重建（demo 用，容錯較寬鬆）
+        _VECTOR_STORE = []
+
+
+def _save_vector_store() -> None:
+    """Persist current in-memory vector store to disk."""
+    VECTOR_STORE_PATH.write_text(
+        json.dumps([asdict(c) for c in _VECTOR_STORE], ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+# module import 時載入一次
+_load_vector_store()
+
+
+def embed_text(text: str) -> List[float]:
     """
-    Split a long string into overlapping character-based chunks.
+    Call OpenAI embeddings API and return a vector.
 
-    Args:
-        text:
-            Raw text content.
-        max_chunk_chars:
-            Target maximum length for each chunk (approx. 300–500 chars
-            recommended for v0.7 MVP).
-        overlap_chars:
-            Number of characters to overlap between consecutive chunks
-            to reduce boundary issues.
-
-    Returns:
-        A list of tuples: (chunk_text, start_index, end_index),
-        where start_index and end_index are 0-based character indices
-        into the original text.
+    抽成獨立函式，方便未來更換模型或改成 self-hosted embedding。
     """
-    text = text or ""
     text = text.strip()
     if not text:
         return []
 
-    max_len = max(50, max_chunk_chars)  # avoid too small by mistake
-    overlap = max(0, min(overlap_chars, max_len - 1))
+    resp = _client.embeddings.create(
+        model=EMBEDDING_MODEL,
+        input=text,
+    )
+    # new OpenAI client: resp.data[0].embedding
+    return resp.data[0].embedding  # type: ignore[no-any-return]
 
-    chunks: List[Tuple[str, int, int]] = []
+
+def _cosine_similarity(a: List[float], b: List[float]) -> float:
+    """Compute cosine similarity between two vectors."""
+    if not a or not b or len(a) != len(b):
+        return 0.0
+
+    dot = sum(x * y for x, y in zip(a, b))
+    na = math.sqrt(sum(x * x for x in a))
+    nb = math.sqrt(sum(y * y for y in b))
+    if na == 0.0 or nb == 0.0:
+        return 0.0
+    return dot / (na * nb)
+
+
+def _simple_text_splitter(
+    text: str, max_chars: int = 1200, overlap: int = 200
+) -> List[str]:
+    """
+    Very small, character-based splitter.
+
+    對 demo 來說已經足夠，不額外引入 tiktoken。
+    """
+    text = text.replace("\r\n", "\n").strip()
+    if not text:
+        return []
+
+    chunks: List[str] = []
     start = 0
-    text_len = len(text)
+    length = len(text)
 
-    while start < text_len:
-        end = min(start + max_len, text_len)
+    while start < length:
+        end = min(start + max_chars, length)
         chunk = text[start:end].strip()
-
         if chunk:
-            chunks.append((chunk, start, end))
-
-        if end >= text_len:
+            chunks.append(chunk)
+        if end == length:
             break
-
-        # 下一個 chunk 從 end - overlap 開始，創造重疊區
-        start = max(0, end - overlap)
+        start = end - overlap  # 重疊一點，避免斷句太硬
 
     return chunks
 
 
-# =========================
-# Embedding helpers
-# =========================
+# ==========================
+# 搜尋 API (給 app.py 用)
+# ==========================
 
-def embed_text(text: str) -> List[float]:
+
+def search_chunks(
+    query_embedding: List[float],
+    top_k: int = 3,
+    score_threshold: Optional[float] = None,
+) -> List[Tuple[StoredChunk, float]]:
     """
-    Generate an embedding vector for a single piece of text.
+    在本地 vector store 裡做簡單 cosine similarity 搜尋。
 
-    Uses OpenAI text-embedding-3-small for low-cost semantic embeddings.
-
-    Args:
-        text:
-            Input text to embed.
-
-    Returns:
-        A list of floats representing the embedding vector.
+    回傳 [(StoredChunk, score), ...]，已依 score 由高到低排序。
     """
-    text = (text or "").strip()
-    if not text:
-        raise ValueError("Cannot embed empty text.")
-
-    res = client.embeddings.create(
-        model=EMBEDDING_MODEL,
-        input=text,
-    )
-    return res.data[0].embedding
-
-
-def embed_texts(texts: Sequence[str]) -> List[List[float]]:
-    """
-    Generate embeddings for a sequence of texts.
-
-    Args:
-        texts:
-            A sequence of non-empty strings.
-
-    Returns:
-        A list of embedding vectors, one per input text.
-    """
-    cleaned_texts = [(t or "").strip() for t in texts]
-    if not cleaned_texts:
+    if not query_embedding or not _VECTOR_STORE:
         return []
 
-    # 過濾掉完全空白的內容，以免 API 出錯
-    non_empty_texts: List[str] = [t for t in cleaned_texts if t]
-    if not non_empty_texts:
-        raise ValueError("All texts are empty; nothing to embed.")
+    scored: List[Tuple[StoredChunk, float]] = []
+    for item in _VECTOR_STORE:
+        score = _cosine_similarity(query_embedding, item.embedding)
+        if score_threshold is None or score >= score_threshold:
+            scored.append((item, score))
 
-    res = client.embeddings.create(
-        model=EMBEDDING_MODEL,
-        input=non_empty_texts,
-    )
-    embeddings = [item.embedding for item in res.data]
+    scored.sort(key=lambda pair: pair[1], reverse=True)
+    return scored[:top_k]
 
-    # 如果中間有空 string，目前不支援保持原位置（MVP）
-    # 之後若需要，可增加 mapping。
-    if len(embeddings) != len(non_empty_texts):
-        raise RuntimeError("Embedding response size mismatch.")
-
-    return embeddings
-
-
-# =========================
-# KB building helpers
-# =========================
-
-def build_kb_from_text(
-    text: str,
-    file_name: str = "inline_text",
-    page: Optional[int] = None,
-    max_chunk_chars: int = 400,
-    overlap_chars: int = 50,
-) -> int:
-    """
-    Build knowledge base entries from a raw text string.
-
-    This function:
-    1) Chunks the text
-    2) Embeds each chunk
-    3) Adds the chunks to the global vector store with metadata
-
-    Args:
-        text:
-            Raw text content.
-        file_name:
-            Logical file name for metadata and tracing (e.g., "lesson4.txt").
-        page:
-            Optional page number. For TXT-based ingestion, this is usually None.
-            For PDF-based ingestion, this can be the actual page index (1-based).
-        max_chunk_chars:
-            Max characters per chunk.
-        overlap_chars:
-            Overlap between chunks.
-
-    Returns:
-        Number of chunks added to the vector store.
-    """
-    chunks = chunk_text(
-        text=text,
-        max_chunk_chars=max_chunk_chars,
-        overlap_chars=overlap_chars,
-    )
-    if not chunks:
-        return 0
-
-    chunk_texts = [c[0] for c in chunks]
-    embeddings = embed_texts(chunk_texts)
-
-    metadatas: List[Dict[str, Any]] = []
-    for idx, (_, start_char, end_char) in enumerate(chunks):
-        chunk_id = f"{file_name}_chunk_{idx+1:04d}"
-        metadatas.append(
-            {
-                "chunk_id": chunk_id,
-                "file_name": file_name,
-                "page": page,
-                "start_char": start_char,
-                "end_char": end_char,
-            }
-        )
-
-    add_chunk_embeddings(
-        embeddings=embeddings,
-        texts=chunk_texts,
-        metadatas=metadatas,
-    )
-
-    return len(chunks)
-
-
-def build_kb_from_txt_file(
-    file_path: str,
-    max_chunk_chars: int = 400,
-    overlap_chars: int = 50,
-) -> int:
-    """
-    Build KB entries from a .txt file.
-
-    This is the primary V1 ingestion path for MentorFlow v0.7.
-
-    Args:
-        file_path:
-            Path to the .txt file.
-        max_chunk_chars:
-            Max characters per chunk.
-        overlap_chars:
-            Overlap between chunks.
-
-    Returns:
-        Number of chunks added.
-    """
-    path = Path(file_path)
-    if not path.exists():
-        raise FileNotFoundError(f"TXT file not found: {file_path}")
-
-    text = path.read_text(encoding="utf-8")
-    file_name = path.name
-
-    return build_kb_from_text(
-        text=text,
-        file_name=file_name,
-        page=None,
-        max_chunk_chars=max_chunk_chars,
-        overlap_chars=overlap_chars,
-    )
-
-
-def build_kb_from_pdf_file(
-    file_path: str,
-    max_chunk_chars: int = 400,
-    overlap_chars: int = 50,
-) -> int:
-    """
-    Build KB entries from a PDF file.
-
-    This is an optional V1.1 feature. It uses pypdf for simple text extraction.
-    If pypdf is not installed, this function will raise an ImportError.
-
-    Args:
-        file_path:
-            Path to the PDF file.
-        max_chunk_chars:
-            Max characters per chunk.
-        overlap_chars:
-            Overlap between chunks.
-
-    Returns:
-        Total number of chunks added across all pages.
-    """
-    try:
-        from pypdf import PdfReader  # type: ignore
-    except ImportError as exc:
-        raise ImportError(
-            "pypdf is required for PDF ingestion. Please install it first."
-        ) from exc
-
-    path = Path(file_path)
-    if not path.exists():
-        raise FileNotFoundError(f"PDF file not found: {file_path}")
-
-    reader = PdfReader(str(path))
-    total_chunks = 0
-    file_name = path.name
-
-    for page_index, page in enumerate(reader.pages, start=1):
-        raw_text = page.extract_text() or ""
-        raw_text = raw_text.strip()
-        if not raw_text:
-            continue
-
-        added = build_kb_from_text(
-            text=raw_text,
-            file_name=file_name,
-            page=page_index,
-            max_chunk_chars=max_chunk_chars,
-            overlap_chars=overlap_chars,
-        )
-        total_chunks += added
-
-    return total_chunks
-
-
-# =========================
-# Retrieval for RAG answers
-# =========================
 
 def retrieve_relevant_chunks(
     question: str,
@@ -324,31 +196,38 @@ def retrieve_relevant_chunks(
 ) -> List[Dict[str, Any]]:
     """
     Retrieve Top-K relevant chunks for a given user question.
-    """
 
+    This function:
+    1) Embeds the question
+    2) Searches the vector store
+    3) Returns a list of dicts containing text, score, and metadata,
+       ready to be used by the RAG prompt builder.
+
+    Args:
+        question:
+            User's natural language question.
+        top_k:
+            Maximum number of chunks to retrieve.
+        score_threshold:
+            Optional minimum cosine similarity.
+
+    Returns:
+        A list of dicts, each containing:
+        - "text": str
+        - "score": float
+        - "metadata": Dict[str, Any]
+    """
     question = (question or "").strip()
     if not question:
         return []
 
-    # 1) embed question
     query_embedding = embed_text(question)
-
-    # 2) search vector DB
     results = search_chunks(
         query_embedding=query_embedding,
         top_k=top_k,
-        score_threshold=score_threshold,  # if implemented in the store
+        score_threshold=score_threshold,
     )
 
-    # 2.5) fallback threshold filtering (in case vector store didn't apply it)
-    if score_threshold is not None:
-        results = [
-            (item, score)
-            for item, score in results
-            if score is not None and score >= score_threshold
-        ]
-
-    # 3) format output
     formatted: List[Dict[str, Any]] = []
     for item, score in results:
         formatted.append(
@@ -361,3 +240,90 @@ def retrieve_relevant_chunks(
 
     return formatted
 
+
+# ==========================
+# 上傳 / 建立知識庫
+# ==========================
+
+
+def _ingest_text(
+    text: str,
+    *,
+    source_file: Path,
+    doc_type: str,
+) -> Dict[str, Any]:
+    """
+    Core ingestion logic shared by TXT & PDF.
+
+    會：
+    1. 切 chunk
+    2. 為每個 chunk 建 embedding
+    3. 寫入 in-memory store 並存檔到 JSON
+    """
+    global _VECTOR_STORE
+
+    chunks = _simple_text_splitter(text)
+    if not chunks:
+        return {
+            "status": "no_content",
+            "chunks_added": 0,
+            "doc_id": source_file.name,
+        }
+
+    new_items: List[StoredChunk] = []
+
+    for idx, chunk in enumerate(chunks):
+        embedding = embed_text(chunk)
+        metadata = {
+            "doc_id": source_file.name,
+            "chunk_index": idx,
+            "doc_type": doc_type,
+            "relative_path": str(source_file.name),
+        }
+        new_items.append(
+            StoredChunk(
+                id=f"{source_file.name}__{idx}",
+                text=chunk,
+                embedding=embedding,
+                metadata=metadata,
+            )
+        )
+
+    _VECTOR_STORE.extend(new_items)
+    _save_vector_store()
+
+    return {
+        "status": "ok",
+        "chunks_added": len(new_items),
+        "doc_id": source_file.name,
+    }
+
+
+def build_kb_from_txt_file(file_path: Path) -> Dict[str, Any]:
+    """
+    Ingest a plain text file into the vector store.
+
+    Called by /admin/upload endpoint when content_type starts with text/plain.
+    """
+    text = file_path.read_text(encoding="utf-8", errors="ignore")
+    return _ingest_text(text, source_file=file_path, doc_type="txt")
+
+
+def build_kb_from_pdf_file(file_path: Path) -> Dict[str, Any]:
+    """
+    Ingest a PDF file into the vector store.
+
+    For simplicity we use PyPDF2 (if available). If import fails,
+    this will raise an ImportError and FastAPI 會回傳 500。
+    """
+    try:
+        import PyPDF2  # type: ignore[import]
+
+        reader = PyPDF2.PdfReader(str(file_path))
+        pages = [page.extract_text() or "" for page in reader.pages]
+        text = "\n\n".join(pages)
+    except Exception:
+        # 萬一 PDF 解析失敗，就當成沒有內容
+        text = ""
+
+    return _ingest_text(text, source_file=file_path, doc_type="pdf")
