@@ -27,6 +27,9 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from openai import OpenAI
 
+from fastapi import UploadFile, HTTPException
+
+
 # ==========================
 # 路徑 & 基本設定
 # ==========================
@@ -327,3 +330,47 @@ def build_kb_from_pdf_file(file_path: Path) -> Dict[str, Any]:
         text = ""
 
     return _ingest_text(text, source_file=file_path, doc_type="pdf")
+
+async def handle_admin_upload(file: UploadFile) -> Dict[str, Any]:
+    """
+    FastAPI 專用的上傳處理入口。
+
+    app.py 會呼叫這個函式：
+        result = await handle_admin_upload(file)
+
+    這裡負責：
+    1) 檢查副檔名
+    2) 把上傳檔案存到 UPLOAD_DIR
+    3) 依檔案類型呼叫 build_kb_from_txt_file 或 build_kb_from_pdf_file
+    4) 回傳簡單的 JSON 給前端
+    """
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="File must have a name.")
+
+    suffix = Path(file.filename).suffix.lower()
+    if suffix not in {".txt", ".pdf"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Only .txt and .pdf files are supported.",
+        )
+
+    # 確保上傳目錄存在
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+    # 儲存原始檔案
+    target_path = UPLOAD_DIR / Path(file.filename).name
+    contents = await file.read()
+    target_path.write_bytes(contents)
+
+    # 依副檔名進行向量化與寫入向量庫
+    if suffix == ".txt":
+        ingest_result = build_kb_from_txt_file(target_path)
+    else:
+        ingest_result = build_kb_from_pdf_file(target_path)
+
+    return {
+        "status": "ok",
+        "filename": target_path.name,
+        "chunks_added": ingest_result.get("chunks_added"),
+        "doc_id": ingest_result.get("doc_id"),
+    }
