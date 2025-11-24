@@ -1,0 +1,130 @@
+Lesson 5: Related Areas of Project Management (Interactive Version)
+
+[Unit 5.1]
+[Concept]
+A program is a group of related projects managed together to achieve benefits that individual projects cannot produce alone. Program managers coordinate schedules, resources, logistics, and cross-project communication.
+
+[Check Understanding]
+What is a program in project management?
+
+[Key Points]
+- A group of related projects
+- Managed together for shared benefits
+
+[Score Rule]
+Mention “related projects” or “shared benefits” → +1.
+
+[Next Question]
+Why do some initiatives need multiple related projects instead of one?
+
+[Unit 5.2]
+[Concept]
+A portfolio contains all organizational investments: projects, programs, and sometimes operations. Portfolio managers make decisions based on ROI, strategic fit, success factors, and risks.
+
+[Check Understanding]
+How is a portfolio different from a program?
+
+[Key Points]
+- Portfolio = all investments
+- Program = related projects only
+
+[Score Rule]
+Clear distinction between “broader scope” vs “related projects” → +1.
+
+[Next Question]
+Why is alignment with business strategy important for portfolio decisions?
+
+[Unit 5.3]
+[Concept]
+A Project Management Office (PMO) provides governance, templates, shared resources, training, and project audits. Three PMO types: Supportive (guidance), Controlling (enforces processes), Directive (directly manages projects).
+
+[Check Understanding]
+What is one function of a PMO?
+
+[Key Points]
+- Governance
+- Templates and tools
+- Training and mentoring
+- Resource coordination
+- Project audits
+
+[Score Rule]
+Mention any correct PMO function → +1.
+
+[Next Question]
+What is the difference between a supportive and a controlling PMO?
+
+[Unit 5.4]
+[Concept]
+Projects are temporary and drive change. Operations are ongoing and repetitive, supporting daily business activities such as procurement, finance, and customer service. Both require people and resources but serve different purposes.
+
+[Check Understanding]
+What is one key difference between projects and operations?
+
+[Key Points]
+- Projects are temporary
+- Operations are ongoing
+
+[Score Rule]
+Mention “temporary” vs “ongoing” → +1.
+
+[Next Question]
+Can you think of an example of an operational activity?
+
+[Unit 5.5]
+[Concept]
+Organizational Project Management (OPM) ensures all projects and programs align with strategy. It includes goals and tactics, value-based decisions, result delivery, and business value realization. OPM creates consistency and improves outcomes.
+
+[Check Understanding]
+Why do organizations use OPM?
+
+[Key Points]
+- Alignment with strategy
+- Consistency
+- Better performance and value
+
+[Score Rule]
+Mention alignment or consistency → +1.
+
+[Next Question]
+How does OPM help organizations avoid wasted projects?
+
+[Unit 5.6]
+[Concept]
+Project environments include physical, social, cultural, and organizational elements. Physical factors include location, weather, safety rules, and infrastructure. Social and cultural influences include values, ethics, politics, and organizational culture. Organizational factors include governance, policies, communication rules, structure, and resource availability.
+
+[Check Understanding]
+What is one example of a physical project environment factor?
+
+[Key Points]
+- Location
+- Weather
+- Safety requirements
+- Access limitations
+- Facilities or equipment
+
+[Score Rule]
+Any correct physical factor → +1.
+
+[Next Question]
+How can organizational culture affect a project?
+
+[Unit 5.7]
+[Concept]
+Knowing terminology is essential for PMP success. Questions often use synonyms or distractors. Understanding terms improves clarity, decision-making, and accuracy.
+
+[Check Understanding]
+Why is knowing terminology important for the PMP exam?
+
+[Key Points]
+- Helps understand questions
+- Avoids confusion
+- Improves accuracy
+
+[Score Rule]
+Mention comprehension or accuracy benefits → +1.
+
+[Next Question]
+Which project management term do you currently find confusing?
+
+End of Lesson 5.

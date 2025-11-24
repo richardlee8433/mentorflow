@@ -1,0 +1,109 @@
+Lesson 4: Project Management Foundations (Interactive Version)
+
+[Unit 4.1]
+[Concept]
+A project is a temporary endeavor with a defined beginning and end. It creates a unique product, service, or result. Projects end when objectives are achieved, when needs disappear, when resources are unavailable, or when laws or strategy change.
+
+[Check Understanding]
+Why is a project considered temporary?
+
+[Key Points]
+- Has a defined start and end
+- Not ongoing like operations
+
+[Score Rule]
+If the learner mentions “defined start/end,” “temporary,” or “not ongoing,” give +1.
+
+[Next Question]
+Can you give one real-world example of a temporary project?
+
+[Unit 4.2]
+[Concept]
+Projects drive change. They move an organization from a current state to a desired future state. They perform one of four change actions: Move, Add, Change, Delete (MACD). Some projects require a transition state, such as phased IT upgrades.
+
+[Check Understanding]
+What are the four types of change that projects create?
+
+[Key Points]
+- Move
+- Add
+- Change
+- Delete
+
+[Score Rule]
+If the learner mentions at least two MACD actions, give +1.
+
+[Next Question]
+Why might a project require a transition state?
+
+[Unit 4.3]
+[Concept]
+Projects are created to deliver business value. Four major triggers for project initiation are: regulatory or legal needs, stakeholder requests, technological advances, or improving/fixing existing processes and products.
+
+[Check Understanding]
+What is one common reason an organization starts a project?
+
+[Key Points]
+- Regulation or legal compliance
+- Stakeholder request
+- New technology
+- Process/product improvement
+
+[Score Rule]
+If the learner mentions any one correct initiation reason → +1.
+
+[Next Question]
+How does business value influence project selection?
+
+[Unit 4.4]
+[Concept]
+Project management applies knowledge, skills, tools, and techniques to meet project requirements. The project manager gathers requirements, manages expectations, communicates frequently, coordinates stakeholders, and balances constraints such as scope, cost, schedule, quality, resources, and risk. Progressive elaboration means refining details as the project becomes clearer.
+
+[Check Understanding]
+What does progressive elaboration mean?
+
+[Key Points]
+- Start broad, refine over time
+- Details become clearer as the project progresses
+
+[Score Rule]
+If learner expresses refinement of details over time → +1.
+
+[Next Question]
+Which project constraint do you think is hardest to control? Why?
+
+[Unit 4.5]
+[Concept]
+Project management applies across industries: IT, healthcare, construction, government, manufacturing, and more. Regardless of industry, the core process groups remain the same: Initiating, Planning, Executing, Monitoring and Controlling, Closing.
+
+[Check Understanding]
+Do all industries use the same project management principles?
+
+[Key Points]
+- Yes
+- Principles are universal even if application differs
+
+[Score Rule]
+If learner answers “yes” and explains universality → +1.
+
+[Next Question]
+Can you name one industry and describe a project within it?
+
+[Unit 4.6]
+[Concept]
+The Project Management Life Cycle (Initiate, Plan, Execute, Monitor/Control, Close) is always the same. The Project Life Cycle depends on the work type and contains unique phases, such as foundation or framing in construction.
+
+[Check Understanding]
+How is the Project Management Life Cycle different from the Project Life Cycle?
+
+[Key Points]
+- PM Life Cycle is fixed process groups
+- Project Life Cycle is unique to the project’s type of work
+
+[Score Rule]
+If learner contrasts “fixed process groups” vs “unique phases” → +1.
+
+[Next Question]
+Why is it important to understand both life cycles?
+
+End of Lesson 4.
