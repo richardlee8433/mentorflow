@@ -1,7 +1,7 @@
 import os
 import re
 import base64
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,13 +14,15 @@ from lesson_content import ROLEPLAY_SCENARIO, score_open_answer
 from lessons import LESSONS as JSON_LESSONS
 
 # RAG service (your MVP implementation)
+
 from services.rag_service import (
     handle_admin_upload,
     retrieve_relevant_chunks,
-    RAG_ENABLED,
     set_rag_enabled,
     get_rag_status,
+    get_documents_summary,
 )
+
 
 # =========================
 # FastAPI initialization
@@ -73,6 +75,41 @@ def get_session(user_id: str) -> Dict:
             "roleplay_done": False,
         }
     return SESSIONS[user_id]
+
+# =========================
+# Region metrics (for Admin dashboard)
+# =========================
+
+REGION_METRICS: Dict[str, Dict[str, Any]] = {}
+
+
+def update_region_metrics(region: Optional[str], user_id: str) -> None:
+    """
+    Very small in-memory metrics for demo.
+    Track how many requests come from each region and unique user count.
+    """
+    if not region:
+        region = "unknown"
+
+    entry = REGION_METRICS.setdefault(
+        region,
+        {"region": region, "user_ids": set(), "total_requests": 0},
+    )
+    entry["user_ids"].add(user_id)
+    entry["total_requests"] += 1
+
+
+def get_region_metrics() -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    for region, data in REGION_METRICS.items():
+        rows.append(
+            {
+                "region": region,
+                "user_count": len(data["user_ids"]),
+                "total_requests": data["total_requests"],
+            }
+        )
+    return rows
 
 # =========================
 # Lesson helpers
@@ -258,8 +295,9 @@ def core_chat(user_id: str, msg: str) -> Dict:
         return {"reply": continue_lesson(user_id, msg)}
 
     # general chat (RAG or normal)
-    if RAG_ENABLED:
+    if get_rag_status().get("rag_enabled"):
         return chat_with_rag(user_id, msg)
+
 
     # fallback to normal LLM
     res = client.chat.completions.create(
@@ -279,6 +317,8 @@ def core_chat(user_id: str, msg: str) -> Dict:
 class ChatRequest(BaseModel):
     user_id: str
     message: str
+    region: Optional[str] = None
+
 
 
 class ChatResponse(BaseModel):
@@ -294,6 +334,9 @@ class ChatResponse(BaseModel):
 
 @app.post("/chat", response_model=ChatResponse)
 def chat_endpoint(req: ChatRequest):
+    # 更新 Region metrics
+    update_region_metrics(req.region, req.user_id)
+
     data = core_chat(req.user_id, req.message)
 
     # tts
@@ -340,6 +383,13 @@ class RagToggleRequest(BaseModel):
 def rag_toggle(req: RagToggleRequest):
     return set_rag_enabled(req.enabled)
 
+@app.post("/admin/toggle-rag")
+def rag_toggle_alias(req: RagToggleRequest):
+    """
+    Alias for frontend: /admin/toggle-rag
+    """
+    return set_rag_enabled(req.enabled)
+
 # =========================
 # Report / Reset
 # =========================
@@ -352,21 +402,40 @@ def report(req: ReportRequest):
     s = get_session(req.user_id)
     passed = int(s["roleplay_score"] >= ROLEPLAY_SCENARIO["passing_score"])
     progress = min(100, 20 + s["correct_in_lesson"] * 10 + passed * 40)
+    rag = get_rag_status()
+    documents = get_documents_summary()
     return {
         "mode": s["mode"],
         "correct_in_lesson": s["correct_in_lesson"],
         "unlocked_lessons": s["unlocked_lessons"],
         "roleplay_score": s["roleplay_score"],
         "progress_percent": progress,
-        "rag_enabled": RAG_ENABLED,
+        "rag_enabled": rag["rag_enabled"],
+        "documents": documents,
     }
 
-@app.post("/reset")
-def reset(req: ReportRequest):
-    if req.user_id in SESSIONS:
-        del SESSIONS[req.user_id]
-    return {"ok": True}
+@app.get("/report")
+def report_get():
+    """
+    Lightweight RAG report for the Admin tab.
+    """
+    rag = get_rag_status()
+    documents = get_documents_summary()
+    return {
+        "rag_enabled": rag["rag_enabled"],
+        "documents": documents,
+    }
+
+@app.get("/metrics/regions")
+def metrics_regions():
+    """
+    Simple region metrics for the Admin dashboard.
+    """
+    return {"regions": get_region_metrics()}
+
+
 
 @app.get("/")
 def health():
-    return {"status": "ok", "rag_enabled": RAG_ENABLED}
+    return {"status": "ok", "rag_enabled": get_rag_status()["rag_enabled"]}
+
