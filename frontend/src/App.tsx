@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { createRoot } from "react-dom/client";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./components/ui/tabs";
 import { Button } from "./components/ui/button";
 import {
@@ -15,121 +14,134 @@ import { Badge } from "./components/ui/badge";
 import { Switch } from "./components/ui/switch";
 import { cn } from "./lib/utils";
 
-const API_BASE =
-  import.meta.env.VITE_API_BASE || "http://localhost:8000";
-
 type Role = "user" | "assistant";
 
-interface ChatMessage {
+type TurnType = "chat" | "lesson" | "lecture" | "roleplay" | "error";
+
+type ChatMessage = {
   id: string;
   role: Role;
   content: string;
-}
+  turnType?: TurnType;
+  createdAt: number;
+};
 
-interface RagSource {
-  text: string;
-  score: number;
-  metadata?: Record<string, any>;
-}
-
-interface ChatResponse {
+type ApiResponse = {
   reply: string;
+  turn_type: TurnType;
   tts_base64?: string | null;
-  rag_used?: boolean;
-  sources?: RagSource[];
-}
+};
 
-interface RagDocument {
-  doc_id: string;
-  filename: string;
-  num_chunks: number;
-}
-
-interface RagReport {
-  rag_enabled: boolean;
-  documents?: RagDocument[];
-}
-
-interface RegionMetric {
-  region: string;
-  user_count: number;
-  total_requests: number;
-}
+type BackendStatus = "unknown" | "ok" | "error";
 
 function usePersistentUserId(key: string): string {
-  const [id] = useState(() => {
-    const existing = window.localStorage.getItem(key);
-    if (existing) return existing;
-    const generated = "user-" + Math.random().toString(36).slice(2, 10);
-    window.localStorage.setItem(key, generated);
-    return generated;
-  });
-  return id;
+  const [userId] = useState(
+    () => {
+      if (typeof window === "undefined") return "anonymous";
+      try {
+        const existing = window.localStorage.getItem(key);
+        if (existing) return existing;
+        const generated = `user_${Math.random().toString(36).slice(2, 10)}`;
+        window.localStorage.setItem(key, generated);
+        return generated;
+      } catch {
+        return `user_${Math.random().toString(36).slice(2, 10)}`;
+      }
+    },
+  );
+  return userId;
 }
 
-function detectRegion(): string {
-  let region = "IE";
-  try {
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
-    if (tz.includes("Europe/") && !tz.includes("Dublin")) {
-      region = "EU";
-    } else {
-      region = "IE";
-    }
-  } catch {
-    region = "IE";
-  }
-  return region;
+function useBackendBaseUrl(): string {
+  return "http://127.0.0.1:8000";
 }
 
 function App() {
   const userId = usePersistentUserId("mentorflow_user_id");
-  const region = useMemo(() => detectRegion(), []);
+  const backendBase = useBackendBaseUrl();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-
-  const [ttsEnabled, setTtsEnabled] = useState<boolean>(() => {
-    const saved = window.localStorage.getItem("mentorflow_tts_enabled");
-    if (saved === null) return true;
-    try {
-      return JSON.parse(saved);
-    } catch {
-      return true;
-    }
-  });
-
-  const [activeTab, setActiveTab] = useState<"learner" | "admin">("learner");
-
-  const [ragEnabled, setRagEnabled] = useState<boolean>(true);
-  const [documents, setDocuments] = useState<RagDocument[]>([]);
+  const [ragEnabled, setRagEnabled] = useState(false);
+  const [ttsEnabled, setTtsEnabled] = useState(true);
+  const [speaking, setSpeaking] = useState(false);
+  const [backendStatus, setBackendStatus] = useState<BackendStatus>("unknown");
+  const [region, setRegion] = useState("EU-1");
   const [uploading, setUploading] = useState(false);
-  const [scratch, setScratch] = useState("");
-  const [metricsLoading, setMetricsLoading] = useState(false);
-  const [regionStats, setRegionStats] = useState<RegionMetric[]>([]);
+  const [adminDocsInfo, setAdminDocsInfo] = useState<string | null>(null);
+
+  const backendLabel = useMemo(() => {
+    if (backendStatus === "ok") return "backend: online";
+    if (backendStatus === "error") return "backend: error";
+    return "backend: checking…";
+  }, [backendStatus]);
 
   useEffect(() => {
-    window.localStorage.setItem(
-      "mentorflow_tts_enabled",
-      JSON.stringify(ttsEnabled),
-    );
-  }, [ttsEnabled]);
+    let cancelled = false;
 
-  async function callChatApi(message: string): Promise<ChatResponse> {
-    const resp = await fetch(`${API_BASE}/chat`, {
+    (async () => {
+      try {
+        const res = await fetch(`${backendBase}/health`);
+        if (!res.ok) throw new Error("health not ok");
+        const data = await res.json();
+        if (!cancelled) {
+          setBackendStatus("ok");
+          if (data.region && typeof data.region === "string") {
+            setRegion(data.region);
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          setBackendStatus("error");
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [backendBase]);
+
+  useEffect(() => {
+    if (!ttsEnabled && speaking) {
+      window.speechSynthesis.cancel();
+      setSpeaking(false);
+    }
+  }, [ttsEnabled, speaking]);
+
+  function speakText(text: string) {
+    if (!ttsEnabled) return;
+    if (!("speechSynthesis" in window)) return;
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.onend = () => setSpeaking(false);
+    utterance.onerror = () => setSpeaking(false);
+    setSpeaking(true);
+    window.speechSynthesis.speak(utterance);
+  }
+
+  async function callChatApi(message: string): Promise<ApiResponse> {
+    const res = await fetch(`${backendBase}/chat`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         user_id: userId,
         message,
+        rag_enabled: ragEnabled,
         region,
       }),
     });
-    if (!resp.ok) {
-      throw new Error(`HTTP ${resp.status}`);
+
+    if (!res.ok) {
+      throw new Error(`Chat API error: ${res.status}`);
     }
-    return resp.json();
+
+    const data = (await res.json()) as ApiResponse;
+    return data;
   }
 
   async function handleSend() {
@@ -137,9 +149,10 @@ function App() {
     if (!text || loading) return;
 
     const userMsg: ChatMessage = {
-      id: crypto.randomUUID(),
+      id: `${Date.now()}-user`,
       role: "user",
       content: text,
+      createdAt: Date.now(),
     };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
@@ -147,39 +160,46 @@ function App() {
 
     try {
       const data = await callChatApi(text);
-      let reply = data.reply || "";
-
-      if (data.rag_used && data.sources && data.sources.length > 0) {
-        const lines = data.sources.map((src, idx) => {
-          const meta = src.metadata || {};
-          const label =
-            (meta.doc_id as string) ||
-            (meta.filename as string) ||
-            `Source #${idx + 1}`;
-          const score =
-            typeof src.score === "number" ? src.score.toFixed(2) : undefined;
-          return score ? `- ${label} (score: ${score})` : `- ${label}`;
-        });
-        reply += `\n\n📚 Sources:\n${lines.join("\n")}`;
-      }
+      const reply = data.reply ?? "";
+      const turnType = data.turn_type ?? "chat";
 
       const aiMsg: ChatMessage = {
-        id: crypto.randomUUID(),
+        id: `${Date.now()}-assistant`,
         role: "assistant",
         content: reply,
+        turnType,
+        createdAt: Date.now(),
       };
       setMessages((prev) => [...prev, aiMsg]);
 
-      if (data.tts_base64 && ttsEnabled) {
-        const audio = new Audio(`data:audio/mp3;base64,${data.tts_base64}`);
-        audio.play().catch(() => {});
+      // Auto read: prefer backend ElevenLabs audio, fallback to browser TTS
+      if (ttsEnabled) {
+        if (data.tts_base64) {
+          try {
+            const audio = new Audio(
+              "data:audio/mpeg;base64," + data.tts_base64,
+            );
+            audio.play().catch((e) => {
+              console.error("Audio play error", e);
+              speakText(reply);
+            });
+          } catch (e) {
+            console.error("Audio playback failed", e);
+            speakText(reply);
+          }
+        } else {
+          speakText(reply);
+        }
       }
     } catch (err) {
       console.error(err);
       const aiMsg: ChatMessage = {
-        id: crypto.randomUUID(),
+        id: `${Date.now()}-assistant-error`,
         role: "assistant",
-        content: "⚠️ Error talking to backend. Please try again.",
+        content:
+          "Something went wrong talking to the backend. Please check if the server is running on 127.0.0.1:8000.",
+        turnType: "error",
+        createdAt: Date.now(),
       };
       setMessages((prev) => [...prev, aiMsg]);
     } finally {
@@ -189,93 +209,65 @@ function App() {
 
   function handleQuickCommand(cmd: string) {
     setInput(cmd);
+    setTimeout(() => {
+      handleSend();
+    }, 0);
   }
 
   function handleClear() {
     setMessages([]);
-    setInput("");
-  }
-
-  async function loadRagReport() {
-    try {
-      const resp = await fetch(`${API_BASE}/report`);
-      if (!resp.ok) return;
-      const data: RagReport = await resp.json();
-      setRagEnabled(data.rag_enabled);
-      setDocuments(data.documents || []);
-    } catch (err) {
-      console.warn("Failed to load RAG report", err);
-    }
-  }
-
-  async function loadRegionMetrics() {
-    setMetricsLoading(true);
-    try {
-      const resp = await fetch(`${API_BASE}/metrics/regions`);
-      if (!resp.ok) return;
-      const data = await resp.json();
-      setRegionStats(data.regions || []);
-    } catch (err) {
-      console.warn("Failed to load region metrics", err);
-    } finally {
-      setMetricsLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    if (activeTab === "admin") {
-      loadRagReport();
-      loadRegionMetrics();
-    }
-  }, [activeTab]);
-
-  async function handleToggleRag(next: boolean) {
-    setRagEnabled(next);
-    try {
-      const resp = await fetch(`${API_BASE}/admin/toggle-rag`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled: next }),
-      });
-      if (!resp.ok) {
-        throw new Error(`HTTP ${resp.status}`);
-      }
-    } catch (err) {
-      console.error("Failed to toggle RAG", err);
-    }
   }
 
   async function handleUploadFile(ev: React.ChangeEvent<HTMLInputElement>) {
     const file = ev.target.files?.[0];
     if (!file) return;
     setUploading(true);
+    setAdminDocsInfo(null);
+
     try {
       const form = new FormData();
       form.append("file", file);
-      const resp = await fetch(`${API_BASE}/admin/upload`, {
+
+      const res = await fetch(`${backendBase}/upload`, {
         method: "POST",
         body: form,
       });
-      if (!resp.ok) {
-        throw new Error(`HTTP ${resp.status}`);
+
+      if (!res.ok) {
+        throw new Error(`Upload error: ${res.status}`);
       }
-      await resp.json();
-      await loadRagReport();
-      ev.target.value = "";
-    } catch (err) {
-      console.error("Upload failed", err);
+
+      const data = (await res.json()) as { detail: string; chunks?: number };
+      let summary = data.detail;
+      if (data.chunks !== undefined) {
+        summary += ` (chunks stored: ${data.chunks})`;
+      }
+      setAdminDocsInfo(summary);
+    } catch (err: any) {
+      console.error(err);
+      setAdminDocsInfo(
+        err?.message ?? "Error uploading file (see console for details).",
+      );
     } finally {
       setUploading(false);
+      ev.target.value = "";
     }
   }
 
   function renderMessage(msg: ChatMessage) {
     const isUser = msg.role === "user";
-    const bubbleClass = isUser
-      ? "bg-emerald-600 text-white rounded-2xl rounded-br-none"
-      : "bg-white text-slate-900 border border-slate-200 rounded-2xl rounded-bl-none";
+    const isError = msg.turnType === "error";
 
-    const label = isUser ? "You" : "MentorFlow";
+    const bubbleBase =
+      "max-w-[90%] rounded-2xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap";
+    const userBubble = cn(
+      bubbleBase,
+      "bg-emerald-600 text-white rounded-br-sm shadow-sm",
+    );
+    const assistantBubble = cn(
+      bubbleBase,
+      "bg-white text-slate-900 border border-slate-200 rounded-bl-sm shadow-sm",
+    );
 
     return (
       <div
@@ -291,14 +283,14 @@ function App() {
               MF
             </span>
           )}
-          <span>{label}</span>
-        </div>
-        <div
-          className={cn(
-            "max-w-[90%] px-3 py-2 text-sm shadow-sm whitespace-pre-wrap",
-            bubbleClass,
+          <span>{isUser ? "You" : "MentorFlow"}</span>
+          {msg.turnType && msg.turnType !== "chat" && !isError && (
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-mono uppercase tracking-wide text-slate-500">
+              {msg.turnType}
+            </span>
           )}
-        >
+        </div>
+        <div className={isUser ? userBubble : assistantBubble}>
           {msg.content}
         </div>
       </div>
@@ -307,37 +299,69 @@ function App() {
 
   const learnerTab = (
     <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-      <Card className="h-[520px] flex flex-col">
+      {/* Left column: main chat / lesson card */}
+      <Card className="flex flex-col">
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold">
+          <CardTitle className="text-base font-semibold">
             Lesson &amp; chat
           </CardTitle>
           <CardDescription className="text-xs">
-            Type your question, or start a lesson / role-play using quick commands.
+            Type your question, or start a lesson / role-play using quick
+            commands.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col flex-1 gap-3">
-          <div className="flex flex-col flex-1 rounded-lg border border-slate-200 bg-slate-50/80 p-3 overflow-y-auto space-y-3">
+        <CardContent className="flex flex-1 flex-col gap-3 pt-0">
+          {/* Message list */}
+          <div className="flex-1 space-y-3 rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-3 overflow-y-auto">
             {messages.length === 0 ? (
-              <div className="flex h-full items-center justify-center text-xs text-slate-500">
-                Start with{" "}
-                <code className="mx-1 rounded bg-slate-900/90 px-1.5 py-0.5 text-[10px] text-white">
-                  start lesson 1
-                </code>{" "}
-                or ask anything about your uploaded documents.
+              <div className="flex h-full items-center justify-center text-xs text-slate-500 text-center">
+                <div className="max-w-md space-y-1">
+                  <p className="font-medium text-slate-700 mb-1">
+                    Try a starting command:
+                  </p>
+                  <p>
+                    <code className="rounded bg-slate-900 px-1.5 py-0.5 text-[11px] text-white">
+                      start lecture 1
+                    </code>{" "}
+                    – podcast-style lecture on Tokens, Embeddings, and Context
+                    Windows.
+                  </p>
+                  <p>
+                    <code className="rounded bg-slate-900 px-1.5 py-0.5 text-[11px] text-white">
+                      start lesson 1
+                    </code>{" "}
+                    – guided lesson with Q&amp;A.
+                  </p>
+                  <p>
+                    <code className="rounded bg-slate-900 px-1.5 py-0.5 text-[11px] text-white">
+                      start roleplay
+                    </code>{" "}
+                    – simulate conversations as an AI PM.
+                  </p>
+                </div>
               </div>
             ) : (
-              messages.map(renderMessage)
-            )}
-            {loading && (
-              <div className="text-xs text-slate-500 animate-pulse">
-                MentorFlow is thinking…
-              </div>
+              <>
+                {messages.map((m) => renderMessage(m))}
+                {loading && (
+                  <div className="text-xs text-slate-500 animate-pulse">
+                    MentorFlow is thinking…
+                  </div>
+                )}
+              </>
             )}
           </div>
 
-          <div className="flex flex-wrap gap-2 text-[11px] text-slate-500">
-            <span className="mr-1 font-medium">Quick commands:</span>
+          {/* Quick commands row */}
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-600">
+            <span className="font-semibold text-slate-700">Quick commands:</span>
+            <Button
+              variant="outline"
+              size="xs"
+              onClick={() => handleQuickCommand("start lecture 1")}
+            >
+              start lecture 1
+            </Button>
             <Button
               variant="outline"
               size="xs"
@@ -348,9 +372,9 @@ function App() {
             <Button
               variant="outline"
               size="xs"
-              onClick={() => handleQuickCommand("start lesson 2")}
+              onClick={() => handleQuickCommand("start lecture 2")}
             >
-              start lesson 2
+              start lecture 2
             </Button>
             <Button
               variant="outline"
@@ -363,30 +387,42 @@ function App() {
               variant="ghost"
               size="xs"
               className="ml-auto text-slate-500 hover:text-slate-900"
+              onClick={() => handleQuickCommand("stop lesson")}
+            >
+              stop lesson
+            </Button>
+            <Button
+              variant="ghost"
+              size="xs"
+              className="text-slate-500 hover:text-slate-900"
               onClick={handleClear}
             >
               Clear chat
             </Button>
           </div>
 
+          {/* Input row */}
           <div className="flex items-center gap-2">
             <Input
               placeholder="Ask a question or continue the lesson..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              className="text-sm text-slate-900 placeholder:text-slate-400"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
                   handleSend();
                 }
               }}
+              disabled={loading}
             />
             <Button onClick={handleSend} disabled={loading || !input.trim()}>
               {loading ? "Thinking…" : "Send"}
             </Button>
           </div>
 
-          <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
+          {/* Footer row */}
+          <div className="flex items-center justify-between border-t border-slate-100 pt-1 text-[11px] text-slate-500">
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
@@ -400,253 +436,201 @@ function App() {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[11px]">🔊 Auto read</span>
-              <Switch
-                checked={ttsEnabled}
-                onCheckedChange={(val) => setTtsEnabled(Boolean(val))}
-              />
+              <span className="inline-flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                <span className="capitalize">{backendLabel}</span>
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-sky-500" />
+                <span>
+                  Auto read:{" "}
+                  <span className="font-mono">
+                    {ttsEnabled ? "ElevenLabs" : "off"}
+                  </span>
+                </span>
+              </span>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <Card className="h-[520px] flex flex-col">
+      {/* Right column: RAG / auto read toggles + tips */}
+      <Card className="flex flex-col">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-semibold">
             What can I learn here?
           </CardTitle>
           <CardDescription className="text-xs">
-            v0.7 focuses on RAG: document-grounded answers &amp; citations.
+            v0.8 focuses on lesson flow &amp; podcast-style lectures. v0.7 RAG
+            upload remains available in the Admin tab.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex-1 flex flex-col gap-3 text-xs text-slate-600">
-          <div className="space-y-1">
-            <p className="font-semibold text-slate-800">Tips</p>
-            <ul className="list-disc pl-4 space-y-1">
-              <li>Upload a TXT/PDF in the Admin tab.</li>
-              <li>Ask questions about the uploaded content.</li>
-              <li>Look for the 📚 Sources block under AI answers.</li>
+        <CardContent className="flex flex-1 flex-col gap-3 pt-0">
+          {/* Toggles */}
+          <div className="space-y-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+            <div className="flex items-center justify-between gap-3">
+              <div className="space-y-0.5">
+                <p className="text-xs font-semibold text-slate-700">
+                  RAG mode
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  When ON, MentorFlow uses your uploaded documents as a
+                  knowledge base and returns citations.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-slate-500">
+                  {ragEnabled ? "On" : "Off"}
+                </span>
+                <Switch
+                  checked={ragEnabled}
+                  onCheckedChange={(val) => setRagEnabled(val)}
+                />
+              </div>
+            </div>
+            <div className="h-px bg-slate-100" />
+            <div className="flex items-center justify-between gap-3">
+              <div className="space-y-0.5">
+                <p className="text-xs font-semibold text-slate-700">
+                  Auto read (TTS)
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  When enabled, MentorFlow will read answers out loud. With
+                  ElevenLabs configured, lectures sound more like a real voice.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-slate-500">
+                  {ttsEnabled ? "On" : "Off"}
+                </span>
+                <Switch
+                  checked={ttsEnabled}
+                  onCheckedChange={(val) => setTtsEnabled(val)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Tips */}
+          <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+            <p className="text-[11px] font-semibold text-slate-700 mb-1">
+              Tips
+            </p>
+            <ul className="list-disc pl-4 space-y-1 text-[11px] text-slate-600">
+              <li>Use quick commands to start a lesson or role-play.</li>
+              <li>
+                In lecture mode, type <code>next</code> to hear the next part,
+                or <code>stop lesson</code> to exit.
+              </li>
+              <li>
+                Ask for explanations, comparisons, and step-by-step reasoning.
+              </li>
+              <li>
+                In Admin tab, upload documents to power RAG-based answers.
+              </li>
             </ul>
           </div>
-          <Textarea
-            className="mt-2 h-40 text-xs"
-            placeholder="Scratchpad – e.g. things you want MentorFlow to explain, PMP notes, exam questions…"
-            value={scratch}
-            onChange={(e) => setScratch(e.target.value)}
-          />
         </CardContent>
       </Card>
     </div>
   );
 
   const adminTab = (
-    <div className="grid gap-4 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold">RAG control</CardTitle>
-          <CardDescription className="text-xs">
-            Upload documents and toggle retrieval-augmented generation.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 text-xs">
-          <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-            <div>
-              <p className="font-medium text-slate-800 text-[13px]">
-                RAG mode
-              </p>
-              <p className="text-[11px] text-slate-500">
-                When enabled, answers are grounded in uploaded documents.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-slate-500">
-                {ragEnabled ? "On" : "Off"}
-              </span>
-              <Switch checked={ragEnabled} onCheckedChange={handleToggleRag} />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <p className="font-medium text-[13px] text-slate-800">
-              Upload knowledge base
-            </p>
-            <p className="text-[11px] text-slate-500">
-              Supported: <code>.txt</code>, <code>.pdf</code>. Each upload is
-              chunked &amp; embedded into a tiny local vector store.
-            </p>
-            <div className="flex items-center gap-2">
-              <Input
-                type="file"
-                accept=".txt,.pdf"
-                onChange={handleUploadFile}
-                className="text-[11px]"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={uploading}
-              >
-                {uploading ? "Uploading…" : "Upload"}
-              </Button>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <p className="font-medium text-[13px] text-slate-800">
-              Indexed documents
-            </p>
-            {documents.length === 0 ? (
-              <p className="text-[11px] text-slate-500">
-                No documents ingested yet. Upload a TXT/PDF to build the KB.
-              </p>
-            ) : (
-              <div className="rounded-md border border-slate-200 bg-white max-h-40 overflow-auto">
-                <table className="min-w-full text-[11px]">
-                  <thead className="bg-slate-50 text-slate-500">
-                    <tr>
-                      <th className="px-2 py-1 text-left font-medium">File</th>
-                      <th className="px-2 py-1 text-right font-medium">
-                        Chunks
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {documents.map((doc) => (
-                      <tr
-                        key={doc.doc_id}
-                        className="border-t border-slate-100"
-                      >
-                        <td className="px-2 py-1">{doc.filename}</td>
-                        <td className="px-2 py-1 text-right">
-                          {doc.num_chunks}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold">
-            Region metrics (demo)
-          </CardTitle>
-          <CardDescription className="text-xs">
-            Simple per-region request counts from the backend.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 text-xs">
-          {metricsLoading ? (
-            <p className="text-slate-500">Loading metrics…</p>
-          ) : regionStats.length === 0 ? (
-            <p className="text-slate-500">
-              No data yet. Send a few chat messages from the learner tab.
-            </p>
-          ) : (
-            <div className="rounded-md border border-slate-200 bg-white max-h-52 overflow-auto">
-              <table className="min-w-full text-[11px]">
-                <thead className="bg-slate-50 text-slate-500">
-                  <tr>
-                    <th className="px-2 py-1 text-left font-medium">Region</th>
-                    <th className="px-2 py-1 text-right font-medium">
-                      Users
-                    </th>
-                    <th className="px-2 py-1 text-right font-medium">
-                      Requests
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {regionStats.map((row) => (
-                    <tr
-                      key={row.region}
-                      className="border-t border-slate-100"
-                    >
-                      <td className="px-2 py-1">{row.region}</td>
-                      <td className="px-2 py-1 text-right">
-                        {row.user_count}
-                      </td>
-                      <td className="px-2 py-1 text-right">
-                        {row.total_requests}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base font-semibold flex items-center gap-2">
+          Admin – RAG documents
+          <Badge variant="outline" className="text-[10px]">
+            v0.8
+          </Badge>
+        </CardTitle>
+        <CardDescription className="text-xs">
+          Upload a TXT/PDF file here to use as a knowledge base for RAG-mode
+          questions.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3 pt-0">
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-slate-700">
+            Upload document
+          </label>
+          <input
+            type="file"
+            accept=".txt,.pdf"
+            onChange={handleUploadFile}
+            disabled={uploading}
+            className="block w-full text-xs text-slate-700 file:mr-2 file:rounded file:border-0 file:bg-slate-900 file:px-2 file:py-1 file:text-xs file:font-semibold file:text-white hover:file:bg-slate-700"
+          />
+          <p className="text-[11px] text-slate-500">
+            Supported formats: .txt, .pdf. Large files will be chunked before
+            indexing.
+          </p>
+        </div>
+        {uploading && (
+          <p className="text-xs text-slate-500">Uploading &amp; indexing…</p>
+        )}
+        {adminDocsInfo && (
+          <p className="text-xs text-slate-600 border border-slate-200 rounded-md px-2 py-1 bg-slate-50">
+            {adminDocsInfo}
+          </p>
+        )}
+        <div className="space-y-1 border-t border-slate-100 pt-2">
+          <p className="text-[11px] font-semibold text-slate-700">Notes</p>
+          <ul className="list-disc pl-4 space-y-1 text-[11px] text-slate-600">
+            <li>
+              RAG mode is controlled from the Learner tab. When ON, answers will
+              use your uploaded documents where relevant.
+            </li>
+            <li>
+              For v0.8, the main focus is lesson flow &amp; lecture mode. RAG
+              remains a supporting feature.
+            </li>
+          </ul>
+        </div>
+      </CardContent>
+    </Card>
   );
 
   return (
-    <div className="min-h-screen bg-slate-100/80 text-slate-900">
-      <div className="mx-auto flex min-h-screen max-w-5xl flex-col px-4 py-6">
-        <header className="mb-4 flex items-center justify-between gap-3">
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-slate-900 text-[11px] font-semibold text-white">
-                MF
-              </span>
-              <div>
-                <h1 className="text-sm font-semibold leading-tight">
-                  MentorFlow – Persona / Lesson Engine
-                </h1>
-                <span className="text-[11px] text-slate-500">
-                  Interactive lesson &amp; RAG teaching assistant
-                </span>
-              </div>
+    <div className="min-h-screen bg-slate-100 text-slate-900 px-3 py-4 md:px-6 md:py-6">
+      <div className="mx-auto flex h-full max-w-6xl flex-col gap-4 rounded-3xl bg-white/90 p-4 shadow-xl ring-1 ring-slate-200 md:p-6">
+        {/* Header */}
+        <header className="flex flex-col gap-3 border-b border-slate-100 pb-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-sm font-semibold text-white shadow-sm">
+              MF
             </div>
-            <div className="flex items-center gap-2 text-[11px] text-slate-500">
-              <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2 py-0.5 text-[10px]">
-                v0.7 – RAG MVP
-              </Badge>
-              <span className="hidden sm:inline">
-                Backend:{" "}
-                <span className="font-mono text-[10px] text-slate-700">
-                  {API_BASE}
-                </span>
-              </span>
+            <div>
+              <h1 className="text-base font-semibold md:text-lg">
+                MentorFlow – Persona / Lesson Engine
+              </h1>
+              <p className="text-xs text-slate-500">
+                Interactive lesson &amp; RAG teaching assistant
+              </p>
             </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-[11px]">
+            <Badge className="bg-emerald-600 text-white hover:bg-emerald-700">
+              v0.8 – Lesson Flow
+            </Badge>
+            <Badge variant="outline" className="font-mono">
+              Backend: {backendBase}
+            </Badge>
           </div>
         </header>
 
-        <Tabs
-          value={activeTab}
-          onValueChange={(v) => setActiveTab(v as "learner" | "admin")}
-          className="flex-1 flex flex-col gap-3"
-        >
-          <TabsList className="w-fit bg-slate-200/70">
-            <TabsTrigger value="learner" className="text-xs">
-              Learner
-            </TabsTrigger>
-            <TabsTrigger value="admin" className="text-xs">
-              Admin
-            </TabsTrigger>
+        {/* Main content */}
+        <Tabs defaultValue="learner">
+          <TabsList className="mb-3 grid w-full grid-cols-2">
+            <TabsTrigger value="learner">Learner</TabsTrigger>
+            <TabsTrigger value="admin">Admin</TabsTrigger>
           </TabsList>
-
-          <TabsContent value="learner" className="flex-1 mt-0">
-            {learnerTab}
-          </TabsContent>
-          <TabsContent value="admin" className="flex-1 mt-0">
-            {adminTab}
-          </TabsContent>
+          <TabsContent value="learner">{learnerTab}</TabsContent>
+          <TabsContent value="admin">{adminTab}</TabsContent>
         </Tabs>
       </div>
     </div>
   );
-}
-
-const container = document.getElementById("root");
-if (container) {
-  const root = createRoot(container);
-  root.render(<App />);
 }
 
 export default App;
