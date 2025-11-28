@@ -1,73 +1,168 @@
-# React + TypeScript + Vite
+# MentorFlow v0.8 — AI PM Learning Space  
+Interactive lesson engine · Podcast-style AI lectures · RAG document search
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+MentorFlow is an interactive learning environment designed to help users learn **AI Product Management** through a combination of structured lessons, narrated lectures, role-play conversations, and retrieval-augmented question-answering.
 
-Currently, two official plugins are available:
+This repository contains the **frontend** (React + TypeScript + Vite).  
+The backend is a separate FastAPI service that provides LLM responses, audio synthesis, RAG search, and lesson/lecture logic.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+# 🌟 Features (v0.8)
 
-The React Compiler is currently not compatible with SWC. See [this issue](https://github.com/vitejs/vite-plugin-react/issues/428) for tracking the progress.
+### 🎧 Podcast-Style Lecture Mode (NEW in v0.8)
+- Generates 230–320 word spoken-narrative lecture scripts  
+- Splits them into multi-part segments (Part 1 / Part 2 / Part 3 / …)  
+- Uses **ElevenLabs TTS** to produce natural mp3 audio  
+- Auto-plays audio in the frontend  
+- Commands:
+  - `start lecture 1`
+  - `next`
+  - `stop lesson`
 
-## Expanding the ESLint configuration
+### 🎓 Lesson Flow (Interactive Learning)
+- Structured multi-unit lessons  
+- Includes Key Idea → Concept → Check Your Understanding  
+- Auto-unlocks next chapters  
+- Lesson state tracked per user  
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### 🎭 Role-Play Mode
+- Scenario-based AI PM role-playing  
+- Multiple conversational turns  
+- Final evaluation & scoring  
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### 📄 RAG Mode (from v0.7)
+- Upload TXT / PDF documents via **Admin** tab  
+- Query against embedded knowledge chunks  
+- Provides grounded answers with citations  
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+---
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+# 🛠 Development Setup
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Frontend uses **React + TypeScript + Vite**.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Install dependencies
+```bash
+npm install
+Run local dev server
+bash
+Copy code
+npm run dev
+Build for production
+bash
+Copy code
+npm run build
+Preview production build
+bash
+Copy code
+npm run preview
+🔗 Backend API Configuration
+MentorFlow frontend communicates with the backend at:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+cpp
+Copy code
+http://127.0.0.1:8000
+To change the backend URL:
+
+javascript
+Copy code
+src/App.tsx → function useBackendBaseUrl()
+Replace with your deployed backend URL:
+
+ts
+Copy code
+function useBackendBaseUrl() {
+  return "https://your-backend-url.com";
+}
+🔧 Required Environment Variables (Backend)
+Set the following variables in your backend hosting platform (Railway / Render / Fly.io):
+
+Key	Required	Description
+OPENAI_API_KEY	Yes	OpenAI model inference
+ELEVENLABS_API_KEY	Yes	Generating mp3 audio
+ELEVENLABS_VOICE_ID	Yes	ElevenLabs voice ID (e.g. 21m00Tcm4TlvDq8ikWAM)
+
+If ELEVENLABS_API_KEY is missing, backend will fallback to browser TTS.
+
+📤 Deployment Guide
+🌐 Frontend Deployment (Vercel / Netlify)
+Run npm run build
+
+Deploy the dist/ folder or connect your GitHub repo
+
+Ensure backend URL is configured correctly in App.tsx
+
+No environment variables needed for frontend
+
+🚀 Backend Deployment (Railway / Render)
+Deploy the FastAPI backend repo
+
+Set required environment variables
+
+Expose port 8000
+
+Confirm logs show:
+
+csharp
+Copy code
+[CFG] ELEVENLABS_API_KEY set: True
+[CFG] ELEVENLABS_VOICE_ID: ...
+🧪 Commands You Can Use (Learner Tab)
+Command	Description
+start lecture 1	Begin podcast-style lecture
+start lesson 1	Guided, structured lesson
+start roleplay	AI PM scenario simulation
+next	Continue lecture
+stop lesson	Exit lecture/lesson mode
+
+🎨 UI Specifications (v0.8)
+White card UI with soft shadows
+
+Slate text hierarchy
+
+Two-column layout (chat left, controls right)
+
+MF brand avatar in header
+
+Auto Read / RAG toggles
+
+Clean system-style chat bubbles
+
+ElevenLabs audio playback integrated
+
+📁 Project Structure
+bash
+Copy code
+src/
+├── components/        # UI components (shadcn/ui)
+├── lib/               # utilities (cn, helpers)
+├── assets/            # icons / images
+├── App.tsx            # main UI logic + chat + lecture mode + audio
+├── main.tsx           # entry point
+└── index.css          # global styles
+Backend is separate and must be deployed independently.
+
+📚 Backend Responsibilities (not included in this repo)
+Lesson engine
+
+Lecture generator
+
+RAG document processing
+
+User session tracking
+
+ElevenLabs mp3 synthesis
+
+Unlock progression system
+
+❤️ Credits
+MentorFlow v0.8
+Built as an AI-powered learning engine for AI Product Management.
+Frontend: React + TypeScript + Vite
+Backend: FastAPI
+Audio: ElevenLabs
+
+📜 License
+MIT License
+Feel free to fork, modify, and build upon MentorFlow.
