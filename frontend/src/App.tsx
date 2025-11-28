@@ -53,7 +53,7 @@ function usePersistentUserId(key: string): string {
 }
 
 function useBackendBaseUrl(): string {
-  return "http://127.0.0.1:8000";
+  return "https://mentorflow.onrender.com";
 }
 
 function App() {
