@@ -1,0 +1,94 @@
+{
+  "id": "chapter5",
+  "title": "AI PM Evaluation, Golden Datasets, and Risk",
+  "units": [
+    {
+      "id": "chapter5_unit1",
+      "title": "Why Evaluation Matters",
+      "material": "There is no guarantee that an LLM will behave consistently. The same prompt can produce different outputs across time, models, and context. Evaluation is the only way to measure accuracy, stability, hallucination rate, context dependency, token cost, and edge-case behavior. Without evaluation, AI features fail silently and teams cannot see when quality degrades.",
+      "question": "Why is evaluation mandatory for AI PMs when shipping LLM features?",
+      "key_points": [
+        "LLM behavior is not guaranteed to be consistent",
+        "Evaluation measures accuracy and stability",
+        "Evaluation tracks hallucination rate and context dependency",
+        "Without evaluation, AI features can fail silently",
+        "PMs must test models like systems, not treat them as magic"
+      ],
+      "min_points": 2,
+      "next_unit": "chapter5_unit2"
+    },
+    {
+      "id": "chapter5_unit2",
+      "title": "Golden Datasets",
+      "material": "A golden dataset is a set of reference Q&A pairs used to evaluate model quality. It allows you to measure correctness, track regressions over time, compare RAG versus non-RAG performance, and track improvements across model versions or prompt changes. Golden sets also enable automated tests so you can run checks before deployments. A model is trustworthy only when tested against a stable reference.",
+      "question": "What is a golden dataset and why is it useful for AI PMs?",
+      "key_points": [
+        "A golden dataset is a set of reference Q&A pairs",
+        "It is used to measure correctness and track regressions",
+        "It helps compare RAG vs non-RAG performance",
+        "It lets teams track improvements between versions",
+        "Golden sets enable automated tests before deployment"
+      ],
+      "min_points": 2,
+      "next_unit": "chapter5_unit3"
+    },
+    {
+      "id": "chapter5_unit3",
+      "title": "Evaluation Metrics for AI PMs",
+      "material": "AI PMs use several core metrics. Accuracy measures whether the model gives the correct answer. Context Hit Rate tells you if retrieval included the right chunk. Hallucination Rate measures how often the model invents facts. Cost per Response tracks token usage, latency, and compute. Session Depth measures how many turns a user continues interacting and can serve as a proxy for usefulness.",
+      "question": "Name two evaluation metrics for LLM systems and explain what each one measures.",
+      "key_points": [
+        "Accuracy measures if answers are correct",
+        "Context Hit Rate measures whether retrieval returned the right chunk",
+        "Hallucination Rate measures how often the model invents facts",
+        "Cost per Response captures token, latency, and compute cost",
+        "Session Depth reflects how long users keep interacting"
+      ],
+      "min_points": 2,
+      "next_unit": "chapter5_unit4"
+    },
+    {
+      "id": "chapter5_unit4",
+      "title": "Risk and Failure Modes",
+      "material": "LLM products fail in repeatable ways. Common failure modes include hallucinations, irrelevant retrieval, prompt drift, bad chunking, overloaded context windows, misinterpreted tasks, inconsistent output formats, and cost explosion. AI PMs must understand these risks and communicate them clearly to engineering and stakeholders so that safeguards and monitoring are built into the product.",
+      "question": "Give one example of a failure mode in LLM systems and briefly describe its impact.",
+      "key_points": [
+        "Hallucinations can produce confident but wrong answers",
+        "Irrelevant retrieval leads to off-topic or incorrect responses",
+        "Prompt drift changes behavior over time in unpredictable ways",
+        "Bad chunking and overloaded context windows hide important information",
+        "Misinterpreted tasks and inconsistent formats break downstream systems",
+        "Cost explosion makes the feature economically unsustainable"
+      ],
+      "min_points": 1,
+      "next_unit": "chapter5_unit5"
+    },
+    {
+      "id": "chapter5_unit5",
+      "title": "Quick Quiz",
+      "material": "Check your understanding: What is a golden dataset used for? What metric measures retrieval quality? What is one failure mode of LLM systems? Why is evaluation mandatory for AI PMs?",
+      "question": "Answer one of the quiz questions in your own words.",
+      "key_points": [
+        "Golden datasets are used to test and compare model quality",
+        "Context Hit Rate measures retrieval quality",
+        "Typical failure modes include hallucinations and irrelevant retrieval",
+        "Evaluation is mandatory to make AI predictable and safe"
+      ],
+      "min_points": 1,
+      "next_unit": "chapter5_unit6"
+    },
+    {
+      "id": "chapter5_unit6",
+      "title": "One-Sentence Summary",
+      "material": "Evaluation makes AI predictable. Without clear metrics, golden datasets, and tests, you cannot ship AI features safely or know when quality has degraded.",
+      "question": "In one sentence, summarize why evaluation is critical for AI PM work.",
+      "key_points": [
+        "Evaluation makes AI behavior predictable",
+        "Without evaluation you cannot ship AI safely",
+        "Metrics and golden datasets reveal quality and regressions"
+      ],
+      "min_points": 1,
+      "next_unit": null
+    }
+  ]
+}

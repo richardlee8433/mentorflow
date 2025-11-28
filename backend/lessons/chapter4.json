@@ -1,0 +1,92 @@
+{
+  "id": "chapter4",
+  "title": "LLM Behavior, Hallucinations, and Reasoning",
+  "units": [
+    {
+      "id": "chapter4_unit1",
+      "title": "How LLMs Generate Text",
+      "material": "LLMs do not know facts. They predict the next likely token based on patterns learned from massive training data. This means they optimize for likelihood, not truth. As a result, they can produce fluent but incorrect answers. Their reasoning is a statistical illusion—patterns that look like logic. Understanding this helps PMs set realistic expectations and avoid over-trusting the model.",
+      "question": "Why do LLMs sometimes produce fluent but incorrect answers?",
+      "key_points": [
+        "LLMs predict the next likely token",
+        "They optimize for likelihood, not truth",
+        "Reasoning is pattern-based, not real understanding",
+        "Fluent text does not guarantee correctness"
+      ],
+      "min_points": 2,
+      "next_unit": "chapter4_unit2"
+    },
+    {
+      "id": "chapter4_unit2",
+      "title": "Why Hallucinations Happen",
+      "material": "Hallucinations occur when the model lacks context, the RAG system retrieves the wrong chunks, prompts are ambiguous, or the question asks about unknown facts. The model attempts to fill in gaps to satisfy user expectations. Hallucinations are not software bugs—they are a natural property of next-token prediction.",
+      "question": "What are two common causes of LLM hallucinations?",
+      "key_points": [
+        "Lack of context",
+        "Wrong or missing retrieval chunks",
+        "Ambiguous prompts",
+        "Unknown facts causing the model to fill gaps",
+        "Hallucinations are inherent to next-token prediction"
+      ],
+      "min_points": 2,
+      "next_unit": "chapter4_unit3"
+    },
+    {
+      "id": "chapter4_unit3",
+      "title": "How to Reduce Hallucinations",
+      "material": "Hallucinations cannot be fully eliminated, but they can be managed. Techniques include RAG, explicit constraints such as 'Do not invent facts,' retrieval status indicators to set expectations, providing more context, reducing question scope, controlling output formats, and using system prompts that restrict creativity. PMs must design these guardrails into real products.",
+      "question": "Name one method to reduce hallucinations and explain why it helps.",
+      "key_points": [
+        "RAG provides grounded context",
+        "Explicit constraints reduce model freedom",
+        "More context reduces guessing",
+        "Smaller scope reduces uncertainty",
+        "Controlled formats reduce hallucination risk",
+        "System prompts can restrict creativity"
+      ],
+      "min_points": 1,
+      "next_unit": "chapter4_unit4"
+    },
+    {
+      "id": "chapter4_unit4",
+      "title": "Reasoning: Real or Simulated?",
+      "material": "LLMs do not think. Their reasoning is simulated through patterns learned from data. However, explicit reasoning prompts such as chain-of-thought or short step-by-step reasoning can improve correctness, stability, transparency, and evaluation quality. LLMs do not understand logic, but they follow logical patterns when instructed clearly.",
+      "question": "Why can explicit reasoning prompts improve model performance even though LLMs are not actually reasoning?",
+      "key_points": [
+        "Reasoning prompts guide the model into more stable patterns",
+        "Chain-of-thought improves correctness",
+        "Short reasoning improves transparency",
+        "Models follow logical patterns even without true understanding"
+      ],
+      "min_points": 2,
+      "next_unit": "chapter4_unit5"
+    },
+    {
+      "id": "chapter4_unit5",
+      "title": "Quick Quiz",
+      "material": "Test your understanding: Why do LLMs hallucinate? What is the difference between truth and likelihood? What is one method to reduce hallucinations? Are LLMs actually reasoning?",
+      "question": "Pick one of the quiz questions and answer it in your own words.",
+      "key_points": [
+        "Hallucinations come from missing context or prediction gaps",
+        "Likelihood is not truth",
+        "Reducing scope or adding context reduces hallucination",
+        "LLMs reason through patterns, not real logic"
+      ],
+      "min_points": 1,
+      "next_unit": "chapter4_unit6"
+    },
+    {
+      "id": "chapter4_unit6",
+      "title": "One-Sentence Summary",
+      "material": "LLMs don’t know truth — they predict the next token based on patterns. Understanding this lets PMs design safer products, reduce hallucinations, and build features grounded in realistic model behavior.",
+      "question": "Summarize the main idea of this chapter in one sentence.",
+      "key_points": [
+        "LLMs predict tokens based on patterns",
+        "They do not know truth",
+        "Understanding this improves product design and safety"
+      ],
+      "min_points": 1,
+      "next_unit": null
+    }
+  ]
+}

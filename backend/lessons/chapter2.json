@@ -1,0 +1,80 @@
+{
+  "id": "chapter2",
+  "title": "Prompting Fundamentals",
+  "units": [
+    {
+      "id": "chapter2_unit1",
+      "title": "What is prompting?",
+      "material": "Prompting is the act of giving instructions, constraints, and context to an LLM. It is not just asking questions. It is closer to natural-language programming because the output quality depends on how well the instructions are designed. For AI PMs, prompting literacy is leverage: you can reduce hallucinations, control the structure and tone of responses, debug AI behavior, and communicate clearly with engineers.",
+      "question": "Why is prompting closer to \"programming with natural language\" than just chatting with the model?",
+      "key_points": [
+        "Prompting is giving instructions, constraints, and context",
+        "Output quality depends on how well the instructions are designed",
+        "It lets you control structure, tone, and behavior of the model",
+        "Prompting literacy gives PMs leverage to debug and reduce hallucinations"
+      ],
+      "min_points": 2,
+      "next_unit": "chapter2_unit2"
+    },
+    {
+      "id": "chapter2_unit2",
+      "title": "The four core prompt types",
+      "material": "There are four core prompt types every AI PM should know. Instruction prompts are direct commands such as \"Summarize this in 3 bullet points.\" Context prompts provide the model with knowledge to use, such as RAG content, uploaded documents, or lesson material. Few-shot example prompts show the model examples so it can copy the pattern, which is useful for formatting, style, or structured tasks. Reasoning prompts explicitly tell the model to think step-by-step and are useful for logic-heavy tasks.",
+      "question": "What are the four core prompt types, and when would you use one of them?",
+      "key_points": [
+        "Instruction prompt",
+        "Context prompt",
+        "Few-shot example prompt",
+        "Reasoning prompt",
+        "Few-shot is used to teach a pattern or format",
+        "Reasoning prompts are used for logic-heavy or multi-step tasks"
+      ],
+      "min_points": 3,
+      "next_unit": "chapter2_unit3"
+    },
+    {
+      "id": "chapter2_unit3",
+      "title": "The six rules of effective prompts",
+      "material": "Effective prompts follow six core rules. First, state a clear role such as \"Act as an AI PM tutor.\" Second, define a single task and avoid mixing multiple tasks like summarize + rewrite + translate in one instruction. Third, specify the output format, for example bullet points, JSON, or a short answer. Fourth, provide enough context, because models hallucinate when information is missing. Fifth, set constraints such as word limits, style, or \"do not invent facts.\" Finally, iterate—prompting is a design process, not luck.",
+      "question": "Name at least two rules of effective prompting and explain why they matter.",
+      "key_points": [
+        "State a clear role for the model",
+        "Define a single task instead of mixing many tasks",
+        "Specify the desired output format",
+        "Provide sufficient context to reduce hallucinations",
+        "Set constraints such as length, style, or do-not-invent-facts",
+        "Iterate and refine prompts as a design process"
+      ],
+      "min_points": 2,
+      "next_unit": "chapter2_unit4"
+    },
+    {
+      "id": "chapter2_unit4",
+      "title": "Good vs bad prompts",
+      "material": "A bad prompt such as \"Explain embeddings\" gives the model almost no guidance. It does not specify the depth, audience, format, or use cases, so the answer will be unpredictable. A better prompt is: \"Explain embeddings in 4 simple bullet points for a non-technical PM. Use a real-world example.\" This prompt is clear, constrained, and predictable because it defines audience, length, format, and style.",
+      "question": "Why is \"Explain embeddings\" a bad prompt compared with the improved version in this lesson?",
+      "key_points": [
+        "The bad prompt lacks audience, depth, format, and use-case constraints",
+        "The improved prompt specifies audience (non-technical PM)",
+        "The improved prompt specifies format and length (4 bullet points)",
+        "The improved prompt asks for a real-world example, making the answer more useful and predictable"
+      ],
+      "min_points": 2,
+      "next_unit": "chapter2_unit5"
+    },
+    {
+      "id": "chapter2_unit5",
+      "title": "Quick quiz and one-sentence summary",
+      "material": "Prompting is similar to programming because you are giving structured instructions to control the model's behavior. Few-shot examples are useful when you want the model to copy a pattern or format. When a prompt contains multiple tasks, the model may mix them or ignore some parts, leading to unstable outputs. One simple rule that improves prompt stability is to define a single clear task. Ultimately, prompting is the interface you use to control model behavior.",
+      "question": "In one or two sentences, summarize why prompting is so important for an AI PM.",
+      "key_points": [
+        "Prompting is the primary interface to control model behavior",
+        "Good prompts reduce hallucinations and increase predictability",
+        "Prompt design lets AI PMs shape structure, tone, and cost of AI features",
+        "Clear single-task prompts make systems easier to debug and maintain"
+      ],
+      "min_points": 1,
+      "next_unit": null
+    }
+  ]
+}

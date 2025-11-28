@@ -1,0 +1,83 @@
+{
+  "id": "chapter3",
+  "title": "RAG & Chunking",
+  "units": [
+    {
+      "id": "chapter3_unit1",
+      "title": "What is RAG?",
+      "material": "Retrieval-Augmented Generation (RAG) means retrieving relevant knowledge and giving it to the model before it answers. Your documents are converted into embeddings, searched, and the retrieved chunks are passed into the LLM so that it can answer based on your content. RAG reduces hallucination, ensures answers come from your documents, scales knowledge without retraining the model, and enables enterprise features like policies, SOPs, and manuals. Without RAG, the model guesses; with RAG, the model cites.",
+      "question": "In your own words, what problem does RAG solve compared to plain LLM chat, and why is that important for enterprises?",
+      "key_points": [
+        "RAG reduces hallucinations by grounding answers in real documents",
+        "RAG ensures answers come from your content, not random guesses",
+        "RAG lets you scale knowledge without retraining the base model",
+        "RAG enables enterprise use cases like policies, SOPs, and manuals",
+        "Without RAG the model guesses, with RAG the model cites"
+      ],
+      "min_points": 2,
+      "next_unit": "chapter3_unit2"
+    },
+    {
+      "id": "chapter3_unit2",
+      "title": "What is chunking and why it matters",
+      "material": "Chunking means splitting long documents into smaller pieces called chunks. Chunk size strongly affects retrieval accuracy, cost, hallucination rate, and context quality. If chunks are too small, they lose context and the model cannot see enough information. If chunks are too large, retrieval becomes noisy and you waste tokens on irrelevant text. A good practical range is around 300–500 characters per chunk. In real systems, chunking decisions drive most of the perceived RAG quality.",
+      "question": "Why is chunk size important in a RAG system, and what can go wrong if chunks are too small or too large?",
+      "key_points": [
+        "Chunking splits long documents into smaller pieces",
+        "Chunk size affects retrieval accuracy and context quality",
+        "Too small chunks lose context and important information",
+        "Too large chunks create noisy retrieval and waste tokens",
+        "A practical guideline is around 300–500 characters per chunk",
+        "Chunking choices are a major driver of overall RAG quality"
+      ],
+      "min_points": 2,
+      "next_unit": "chapter3_unit3"
+    },
+    {
+      "id": "chapter3_unit3",
+      "title": "Embeddings in RAG",
+      "material": "Embeddings convert text into vectors so the system can search by meaning instead of only by keywords. Good embedding models improve recall, meaning they help the system find the right chunks, and precision, meaning they avoid irrelevant chunks. Bad embeddings lead to bad RAG. Many RAG failures are caused by the wrong embedding model, inconsistent chunking, low-quality cleaning, or duplicated and noisy documents. Choosing and evaluating the embedding layer is a core responsibility for an AI PM.",
+      "question": "What does the embedding layer do in a RAG system, and why does choosing a good embedding model matter?",
+      "key_points": [
+        "Embeddings convert text into vectors for semantic search",
+        "Embeddings allow the system to search by meaning, not just keywords",
+        "Good embeddings improve recall and precision of retrieved chunks",
+        "Bad embeddings lead to bad RAG, even if the LLM is strong",
+        "Common RAG failures come from wrong embedding models or noisy data"
+      ],
+      "min_points": 2,
+      "next_unit": "chapter3_unit4"
+    },
+    {
+      "id": "chapter3_unit4",
+      "title": "Limitations and risks of RAG",
+      "material": "RAG is powerful but not magic. It still suffers from retrieval errors, outdated documents, insufficient chunk granularity, conflicting sources, context overflow, and increased token cost. AI PMs need to evaluate RAG quality using metrics like hit rate, relevance, hallucination frequency, and cost impact. Good product decisions accept that RAG introduces a new layer of failure modes that must be monitored and improved over time.",
+      "question": "Name one limitation or risk of RAG and explain how it can affect your product.",
+      "key_points": [
+        "RAG can fail because of retrieval errors or missing chunks",
+        "Documents can be outdated, leading to wrong or stale answers",
+        "Chunks may be too coarse or too fine, hurting granularity",
+        "Sources can conflict, confusing the model and the user",
+        "Context windows can overflow, dropping important information",
+        "RAG increases token cost and must be evaluated for cost impact",
+        "AI PMs should track hit rate, relevance, hallucination frequency, and cost"
+      ],
+      "min_points": 1,
+      "next_unit": "chapter3_unit5"
+    },
+    {
+      "id": "chapter3_unit5",
+      "title": "One-sentence summary of RAG & chunking",
+      "material": "RAG grounds the model's answers in real documents so that it cites instead of guesses. Chunking makes this possible by splitting documents into pieces that can be retrieved, assembled, and fed into the model within its context window. Well-designed chunking plus good embeddings give you stable, explainable answers; poor chunking and embeddings give you expensive hallucinations.",
+      "question": "In one or two sentences, explain how RAG and chunking work together to improve answer quality.",
+      "key_points": [
+        "RAG grounds answers in real documents instead of pure guesses",
+        "Chunking splits documents into pieces that can be retrieved and fed into the model",
+        "Good chunking and embeddings enable stable, explainable answers",
+        "Chunking quality is a core driver of RAG effectiveness"
+      ],
+      "min_points": 1,
+      "next_unit": null
+    }
+  ]
+}
