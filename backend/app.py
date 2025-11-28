@@ -149,21 +149,40 @@ Minimum key points for full score: {min_points}.
 
 def synthesize_speech(text: str, voice: str = "alloy") -> bytes:
     """
-    Synthesize speech using ElevenLabs Text-to-Speech.
+    Synthesize speech from text with a simple in-memory mp3 cache.
 
-    - Primary path: ElevenLabs (if ELEVENLABS_API_KEY is set).
-    - Fallback: OpenAI TTS (gpt-4o-mini-tts) if ElevenLabs is not configured or fails.
+    - 若有設定 ELEVENLABS_API_KEY → 優先使用 ElevenLabs TTS。
+    - 若 ElevenLabs 失敗或沒設定 → fallback 到 OpenAI TTS (gpt-4o-mini-tts)。
+    - 以 (provider + model + voice + text) 產生 cache key，重複文字只會扣一次費用。
 
-    Returns raw mp3 audio bytes. If text is empty or all TTS calls fail, returns b"".
+    Returns:
+        mp3 bytes; 若文字為空或 TTS 全部失敗則回傳 b""。
     """
     text = text.strip()
     if not text:
         return b""
 
+    # ---- 決定 provider 並產生 cache key ----
+    if ELEVENLABS_API_KEY and ELEVENLABS_VOICE_ID:
+        provider = "elevenlabs"
+        cache_key_src = f"{provider}|{ELEVENLABS_MODEL_ID}|{ELEVENLABS_VOICE_ID}|{voice}|{text}"
+    else:
+        provider = "openai"
+        cache_key_src = f"{provider}|gpt-4o-mini-tts|{voice}|{text}"
+
+    cache_key = hashlib.sha256(cache_key_src.encode("utf-8")).hexdigest()
+
+    # ---- 先看 cache 有沒有 ----
+    cached = TTS_CACHE.get(cache_key)
+    if cached:
+        return cached
+
+    audio_bytes: bytes = b""
+
     # -------------------------
-    # Primary: ElevenLabs TTS (non-streaming endpoint)
+    # Primary: ElevenLabs TTS
     # -------------------------
-    if ELEVENLABS_API_KEY:
+    if provider == "elevenlabs":
         try:
             print("[TTS] Using ElevenLabs...")
             tts_url = f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}"
@@ -176,7 +195,7 @@ def synthesize_speech(text: str, voice: str = "alloy") -> bytes:
 
             payload = {
                 "text": text,
-                "model_id": ELEVENLABS_MODEL_ID,  # e.g. eleven_multilingual_v2 / eleven_turbo_v2_5
+                "model_id": ELEVENLABS_MODEL_ID,
                 "voice_settings": {
                     "stability": 0.45,
                     "similarity_boost": 0.8,
@@ -192,35 +211,37 @@ def synthesize_speech(text: str, voice: str = "alloy") -> bytes:
                 timeout=60,
             )
 
-            if resp.ok:
+            if resp.ok and resp.content:
                 audio_bytes = resp.content
-                if audio_bytes:
-                    print("[TTS] ElevenLabs ok, bytes:", len(audio_bytes))
-                    return audio_bytes
-                else:
-                    print("[TTS] ElevenLabs returned empty audio bytes.")
+                print("[TTS] ElevenLabs ok, bytes:", len(audio_bytes))
             else:
                 print(f"[TTS] ElevenLabs error {resp.status_code}: {resp.text[:200]}")
-
         except Exception as exc:
             print(f"[TTS] ElevenLabs exception: {exc}")
 
     # -------------------------
     # Fallback: OpenAI TTS
     # -------------------------
-    print("[TTS] Falling back to OpenAI TTS")
-    try:
-        res = client.audio.speech.create(
-            model="gpt-4o-mini-tts",
-            voice=voice,
-            input=text,
-            response_format="mp3",
-        )
-        audio_bytes = res.content
-        return audio_bytes or b""
-    except Exception as exc:
-        print(f"[TTS ERROR] OpenAI fallback failed: {exc}")
-        return b""
+    if not audio_bytes:
+        print("[TTS] Falling back to OpenAI TTS")
+        try:
+            res = client.audio.speech.create(
+                model="gpt-4o-mini-tts",
+                voice=voice,
+                input=text,
+                response_format="mp3",
+            )
+            audio_bytes = res.content or b""
+        except Exception as exc:
+            print(f"[TTS ERROR] OpenAI fallback failed: {exc}")
+            audio_bytes = b""
+
+    # ---- 寫入 cache ----
+    if audio_bytes:
+        TTS_CACHE[cache_key] = audio_bytes
+
+    return audio_bytes
+
 
 
 
@@ -888,6 +909,18 @@ def root() -> Dict[str, str]:
     Health check endpoint.
     """
     return {"status": "ok", "message": "Persona / MentorFlow v0.8 Teaching API running"}
+
+@app.get("/health")
+def health_check():
+    """
+    Simple health endpoint for uptime checks.
+    """
+    return {
+        "status": "ok",
+        "service": "mentorflow-backend",
+        "version": "v0.8",
+        "region": os.getenv("MENTORFLOW_REGION", "local"),
+    }
 
 
 class ReportRequest(BaseModel):
