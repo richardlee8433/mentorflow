@@ -1,7 +1,7 @@
 import os
 import re
 import base64
-import hashlib 
+import hashlib
 import requests
 from typing import Dict, List, Optional, Tuple
 
@@ -49,9 +49,13 @@ ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
 # 建議模型：multilingual v2
 ELEVENLABS_MODEL_ID = os.getenv("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2")
 
-
 print("[CFG] ELEVENLABS_API_KEY set:", bool(ELEVENLABS_API_KEY))
 print("[CFG] ELEVENLABS_VOICE_ID:", ELEVENLABS_VOICE_ID)
+
+# =========================
+# In-memory TTS cache
+# =========================
+TTS_CACHE: Dict[str, bytes] = {}
 
 # =========================
 # New scorer: semantic, key-point based (reasoning-friendly)
@@ -242,8 +246,6 @@ def synthesize_speech(text: str, voice: str = "alloy") -> bytes:
         TTS_CACHE[cache_key] = audio_bytes
 
     return audio_bytes
-
-
 
 
 def generate_spoken_script(title: str, key_points: List[str], concept_text: str) -> str:
@@ -910,6 +912,7 @@ def root() -> Dict[str, str]:
     Health check endpoint.
     """
     return {"status": "ok", "message": "Persona / MentorFlow v0.8 Teaching API running"}
+
 
 @app.get("/health")
 def health_check():
