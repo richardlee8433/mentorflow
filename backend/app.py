@@ -232,7 +232,7 @@ def synthesize_speech(text: str, voice: str = "alloy") -> bytes:
         try:
             res = client.audio.speech.create(
                 model="gpt-4o-mini-tts",
-                voice=voice,
+                voice=alloy,
                 input=text,
                 response_format="mp3",
             )
