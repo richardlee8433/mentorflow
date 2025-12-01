@@ -30,7 +30,7 @@ LESSON_PROGRESSION = {
 app = FastAPI(title="Persona / MentorFlow v0.8 – Teaching API")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # 開發階段先放寬，之後要可以收緊
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -904,6 +904,45 @@ def chat_endpoint(req: ChatRequest) -> ChatResponse:
     tts_base64 = base64.b64encode(audio_bytes).decode("utf-8") if audio_bytes else None
 
     return ChatResponse(reply=reply, tts_base64=tts_base64, turn_type=turn_type)
+
+
+# ---------- 新增：給 PlayCanvas 3D Mentor 用的精簡版 endpoint ----------
+
+class MentorChatRequest(BaseModel):
+    message: str
+    user_id: Optional[str] = None  # 不傳就用預設 demo user
+
+
+class MentorChatResponse(BaseModel):
+    reply: str
+
+
+@app.post("/api/mentor-chat", response_model=MentorChatResponse)
+def mentor_chat_endpoint(req: MentorChatRequest) -> MentorChatResponse:
+    """
+    Endpoint for 3D Mentor (PlayCanvas / VIVERSE).
+
+    Request:
+      { "message": "Hello from 3D world" }
+
+    Optional:
+      { "message": "...", "user_id": "player-123" }
+
+    Response:
+      { "reply": "..." }  # 已經去掉 HTML，適合直接顯示在 Text 元件
+    """
+    user_id = req.user_id or "npc-demo"
+
+    reply, turn_type = core_chat(user_id, req.message)
+
+    # 去掉 HTML，避免 3D UI 出現 <ul><li> 之類標籤
+    plain = re.sub(r"<.*?>", " ", reply)
+    plain = re.sub(r"\s+", " ", plain).strip()
+
+    if not plain:
+        plain = reply  # 萬一整個被清空，就退回原始文字
+
+    return MentorChatResponse(reply=plain)
 
 
 @app.get("/")
