@@ -228,7 +228,7 @@ def synthesize_speech(text: str, voice: str = "alloy") -> bytes:
 # TTS helper (ElevenLabs + OpenAI fallback)
 # =========================
 
-def synthesize_speech(text: str, voice: str = "alloy") -> bytes:
+def synthesize_speech(text: str, voice: str = "sage") -> bytes:
     """
     Synthesize speech from text with a simple in-memory mp3 cache.
 
@@ -307,7 +307,7 @@ def synthesize_speech(text: str, voice: str = "alloy") -> bytes:
         print("[TTS] Falling back to OpenAI TTS")
         try:
             OPENAI_VOICE_MAP = {
-                "mentor": "alloy",
+                "mentor": "sage",
                 "mentor_female": "nova",
                 "mentor_soft": "ash",
                 "mentor_story": "verse",
