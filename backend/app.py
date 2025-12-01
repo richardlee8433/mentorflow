@@ -1027,3 +1027,29 @@ def reset_endpoint(req: ResetRequest) -> Dict[str, bool]:
     if req.user_id in SESSIONS:
         del SESSIONS[req.user_id]
     return {"ok": True}
+
+from fastapi import Response
+from pydantic import BaseModel
+
+class TTSRequest(BaseModel):
+    text: str
+
+@app.post("/api/tts")
+async def api_tts(req: TTSRequest):
+    """
+    Universal TTS API — front-end 用這個
+    Body: { "text": "Hello world" }
+    回傳: audio/mpeg bytes
+    """
+    text = req.text.strip()
+    if not text:
+        return Response(content=b"", media_type="audio/mpeg")
+
+    # 正確：使用 synthesize_speech()
+    audio_bytes = synthesize_speech(text, voice="mentor")
+
+    return Response(
+        content=audio_bytes,
+        media_type="audio/mpeg"
+    )
+
