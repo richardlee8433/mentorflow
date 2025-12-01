@@ -224,15 +224,100 @@ def synthesize_speech(text: str, voice: str = "alloy") -> bytes:
         except Exception as exc:
             print(f"[TTS] ElevenLabs exception: {exc}")
 
+# =========================
+# TTS helper (ElevenLabs + OpenAI fallback)
+# =========================
+
+def synthesize_speech(text: str, voice: str = "alloy") -> bytes:
+    """
+    Synthesize speech from text with a simple in-memory mp3 cache.
+
+    - 若有設定 ELEVENLABS_API_KEY → 優先使用 ElevenLabs TTS。
+    - 若 ElevenLabs 失敗或沒設定 → fallback 到 OpenAI TTS (gpt-4o-mini-tts)。
+    - 以 (provider + model + voice + text) 產生 cache key，重複文字只會扣一次費用。
+
+    Returns:
+        mp3 bytes; 若文字為空或 TTS 全部失敗則回傳 b""。
+    """
+    text = text.strip()
+    if not text:
+        return b""
+
+    # ---- 決定 provider 並產生 cache key ----
+    if ELEVENLABS_API_KEY and ELEVENLABS_VOICE_ID:
+        provider = "elevenlabs"
+        cache_key_src = f"{provider}|{ELEVENLABS_MODEL_ID}|{ELEVENLABS_VOICE_ID}|{voice}|{text}"
+    else:
+        provider = "openai"
+        cache_key_src = f"{provider}|gpt-4o-mini-tts|{voice}|{text}"
+
+    cache_key = hashlib.sha256(cache_key_src.encode("utf-8")).hexdigest()
+
+    # ---- 先看 cache 有沒有 ----
+    cached = TTS_CACHE.get(cache_key)
+    if cached:
+        return cached
+
+    audio_bytes: bytes = b""
+
+    # -------------------------
+    # Primary: ElevenLabs TTS
+    # -------------------------
+    if provider == "elevenlabs":
+        try:
+            print("[TTS] Using ElevenLabs...")
+            tts_url = f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}"
+
+            headers = {
+                "Accept": "audio/mpeg",
+                "xi-api-key": ELEVENLABS_API_KEY,
+                "Content-Type": "application/json",
+            }
+
+            payload = {
+                "text": text,
+                "model_id": ELEVENLABS_MODEL_ID,
+                "voice_settings": {
+                    "stability": 0.45,
+                    "similarity_boost": 0.8,
+                    "style": 0.3,
+                    "use_speaker_boost": True,
+                },
+            }
+
+            resp = requests.post(
+                tts_url,
+                headers=headers,
+                json=payload,
+                timeout=60,
+            )
+
+            if resp.ok and resp.content:
+                audio_bytes = resp.content
+                print("[TTS] ElevenLabs ok, bytes:", len(audio_bytes))
+            else:
+                print(f"[TTS] ElevenLabs error {resp.status_code}: {resp.text[:200]}")
+        except Exception as exc:
+            print(f"[TTS] ElevenLabs exception: {exc}")
+
     # -------------------------
     # Fallback: OpenAI TTS
     # -------------------------
     if not audio_bytes:
         print("[TTS] Falling back to OpenAI TTS")
         try:
+            OPENAI_VOICE_MAP = {
+                "mentor": "alloy",
+                "mentor_female": "nova",
+                "mentor_soft": "ash",
+                "mentor_story": "verse",
+            }
+
+            openai_voice = OPENAI_VOICE_MAP.get(voice, "alloy")
+
             res = client.audio.speech.create(
                 model="gpt-4o-mini-tts",
-                voice=alloy,
+                voice=openai_voice,
                 input=text,
                 response_format="mp3",
             )
@@ -246,6 +331,7 @@ def synthesize_speech(text: str, voice: str = "alloy") -> bytes:
         TTS_CACHE[cache_key] = audio_bytes
 
     return audio_bytes
+
 
 
 def generate_spoken_script(title: str, key_points: List[str], concept_text: str) -> str:
