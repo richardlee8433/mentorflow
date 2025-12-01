@@ -307,7 +307,7 @@ def synthesize_speech(text: str, voice: str = "sage") -> bytes:
         print("[TTS] Falling back to OpenAI TTS")
         try:
             OPENAI_VOICE_MAP = {
-                "mentor": "sage",
+                "mentor": "onyx",
                 "mentor_female": "nova",
                 "mentor_soft": "ash",
                 "mentor_story": "verse",
