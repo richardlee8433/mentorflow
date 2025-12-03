@@ -231,11 +231,11 @@ def synthesize_speech(text: str, voice: str = "sage") -> bytes:
     # Fallback: OpenAI TTS (multilingual)
     # -------------------------
     if not audio_bytes:
-        print("[TTS] Falling back to OpenAI TTS (gpt-4o-realtime-preview-tts, alloy)")
+        print("[TTS] Falling back to OpenAI TTS (gpt-4o-mini-tts, alloy)")
         try:
             res = client.audio.speech.create(
-                model="gpt-4o-realtime-preview-tts",
-                voice="alloy",          # 多語通用 voice
+                model="gpt-4o-mini-tts",   # ⭐ 最新可用多語 TTS 模型
+                voice="alloy",            # ⭐ 多語
                 input=text,
                 response_format="mp3",
             )
@@ -243,6 +243,7 @@ def synthesize_speech(text: str, voice: str = "sage") -> bytes:
         except Exception as exc:
             print(f"[TTS ERROR] OpenAI fallback failed: {exc}")
             audio_bytes = b""
+
 
     # ---- 寫入 cache ----
     if audio_bytes:
