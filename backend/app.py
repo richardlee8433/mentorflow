@@ -157,18 +157,11 @@ def synthesize_speech(text: str, voice: str = "sage") -> bytes:
     Synthesize speech from text with a simple in-memory mp3 cache.
 
     - 若有設定 ELEVENLABS_API_KEY → 優先使用 ElevenLabs TTS。
-    - 若 ElevenLabs 失敗或沒設定 → fallback 到 OpenAI TTS (gpt-4o-mini-tts)。
+    - 若 ElevenLabs 失敗或沒設定 → fallback 到 OpenAI TTS (gpt-4o-realtime-preview-tts)。
     - 以 (provider + model + voice + text) 產生 cache key，重複文字只會扣一次費用。
 
-    voice 參數支援邏輯：
-    - "mentor"         → OpenAI voice "onyx"
-    - "mentor_female"  → "nova"
-    - "mentor_soft"    → "ash"
-    - "mentor_story"   → "verse"
-    - 其他 / 未指定     → 預設 "alloy"
-
-    Returns:
-        mp3 bytes; 若文字為空或 TTS 全部失敗則回傳 b""。
+    voice 參數目前只在 ElevenLabs 時使用；
+    OpenAI 路徑一律用多語 voice "alloy"。
     """
     text = text.strip()
     if not text:
@@ -177,11 +170,14 @@ def synthesize_speech(text: str, voice: str = "sage") -> bytes:
     # ---- 決定 provider 並產生 cache key ----
     if ELEVENLABS_API_KEY and ELEVENLABS_VOICE_ID:
         provider = "elevenlabs"
-        cache_key_src = f"{provider}|{ELEVENLABS_MODEL_ID}|{ELEVENLABS_VOICE_ID}|{voice}|{text}"
+        model_id = ELEVENLABS_MODEL_ID
+        voice_id = ELEVENLABS_VOICE_ID
     else:
         provider = "openai"
-        cache_key_src = f"{provider}|gpt-4o-mini-tts|{voice}|{text}"
+        model_id = "gpt-4o-realtime-preview-tts"
+        voice_id = "alloy"
 
+    cache_key_src = f"{provider}|{model_id}|{voice_id}|{text}"
     cache_key = hashlib.sha256(cache_key_src.encode("utf-8")).hexdigest()
 
     # ---- 先看 cache 有沒有 ----
@@ -232,23 +228,14 @@ def synthesize_speech(text: str, voice: str = "sage") -> bytes:
             print(f"[TTS] ElevenLabs exception: {exc}")
 
     # -------------------------
-    # Fallback: OpenAI TTS
+    # Fallback: OpenAI TTS (multilingual)
     # -------------------------
     if not audio_bytes:
-        print("[TTS] Falling back to OpenAI TTS")
+        print("[TTS] Falling back to OpenAI TTS (gpt-4o-realtime-preview-tts, alloy)")
         try:
-            OPENAI_VOICE_MAP = {
-                "mentor": "onyx",
-                "mentor_female": "nova",
-                "mentor_soft": "ash",
-                "mentor_story": "verse",
-            }
-
-            openai_voice = OPENAI_VOICE_MAP.get(voice, "alloy")
-
             res = client.audio.speech.create(
-                model="gpt-4o-mini-tts",
-                voice=openai_voice,
+                model="gpt-4o-realtime-preview-tts",
+                voice="alloy",          # 多語通用 voice
                 input=text,
                 response_format="mp3",
             )
@@ -262,6 +249,7 @@ def synthesize_speech(text: str, voice: str = "sage") -> bytes:
         TTS_CACHE[cache_key] = audio_bytes
 
     return audio_bytes
+
 
 
 def generate_spoken_script(title: str, key_points: List[str], concept_text: str) -> str:
