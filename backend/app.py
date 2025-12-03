@@ -5,7 +5,7 @@ import hashlib
 import requests
 from typing import Dict, List, Optional, Tuple
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from openai import OpenAI
@@ -152,82 +152,6 @@ Minimum key points for full score: {min_points}.
 # TTS helper (ElevenLabs + OpenAI fallback)
 # =========================
 
-def synthesize_speech(text: str, voice: str = "alloy") -> bytes:
-    """
-    Synthesize speech from text with a simple in-memory mp3 cache.
-
-    - 若有設定 ELEVENLABS_API_KEY → 優先使用 ElevenLabs TTS。
-    - 若 ElevenLabs 失敗或沒設定 → fallback 到 OpenAI TTS (gpt-4o-mini-tts)。
-    - 以 (provider + model + voice + text) 產生 cache key，重複文字只會扣一次費用。
-
-    Returns:
-        mp3 bytes; 若文字為空或 TTS 全部失敗則回傳 b""。
-    """
-    text = text.strip()
-    if not text:
-        return b""
-
-    # ---- 決定 provider 並產生 cache key ----
-    if ELEVENLABS_API_KEY and ELEVENLABS_VOICE_ID:
-        provider = "elevenlabs"
-        cache_key_src = f"{provider}|{ELEVENLABS_MODEL_ID}|{ELEVENLABS_VOICE_ID}|{voice}|{text}"
-    else:
-        provider = "openai"
-        cache_key_src = f"{provider}|gpt-4o-mini-tts|{voice}|{text}"
-
-    cache_key = hashlib.sha256(cache_key_src.encode("utf-8")).hexdigest()
-
-    # ---- 先看 cache 有沒有 ----
-    cached = TTS_CACHE.get(cache_key)
-    if cached:
-        return cached
-
-    audio_bytes: bytes = b""
-
-    # -------------------------
-    # Primary: ElevenLabs TTS
-    # -------------------------
-    if provider == "elevenlabs":
-        try:
-            print("[TTS] Using ElevenLabs...")
-            tts_url = f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}"
-
-            headers = {
-                "Accept": "audio/mpeg",
-                "xi-api-key": ELEVENLABS_API_KEY,
-                "Content-Type": "application/json",
-            }
-
-            payload = {
-                "text": text,
-                "model_id": ELEVENLABS_MODEL_ID,
-                "voice_settings": {
-                    "stability": 0.45,
-                    "similarity_boost": 0.8,
-                    "style": 0.3,
-                    "use_speaker_boost": True,
-                },
-            }
-
-            resp = requests.post(
-                tts_url,
-                headers=headers,
-                json=payload,
-                timeout=60,
-            )
-
-            if resp.ok and resp.content:
-                audio_bytes = resp.content
-                print("[TTS] ElevenLabs ok, bytes:", len(audio_bytes))
-            else:
-                print(f"[TTS] ElevenLabs error {resp.status_code}: {resp.text[:200]}")
-        except Exception as exc:
-            print(f"[TTS] ElevenLabs exception: {exc}")
-
-# =========================
-# TTS helper (ElevenLabs + OpenAI fallback)
-# =========================
-
 def synthesize_speech(text: str, voice: str = "sage") -> bytes:
     """
     Synthesize speech from text with a simple in-memory mp3 cache.
@@ -235,6 +159,13 @@ def synthesize_speech(text: str, voice: str = "sage") -> bytes:
     - 若有設定 ELEVENLABS_API_KEY → 優先使用 ElevenLabs TTS。
     - 若 ElevenLabs 失敗或沒設定 → fallback 到 OpenAI TTS (gpt-4o-mini-tts)。
     - 以 (provider + model + voice + text) 產生 cache key，重複文字只會扣一次費用。
+
+    voice 參數支援邏輯：
+    - "mentor"         → OpenAI voice "onyx"
+    - "mentor_female"  → "nova"
+    - "mentor_soft"    → "ash"
+    - "mentor_story"   → "verse"
+    - 其他 / 未指定     → 預設 "alloy"
 
     Returns:
         mp3 bytes; 若文字為空或 TTS 全部失敗則回傳 b""。
@@ -331,7 +262,6 @@ def synthesize_speech(text: str, voice: str = "sage") -> bytes:
         TTS_CACHE[cache_key] = audio_bytes
 
     return audio_bytes
-
 
 
 def generate_spoken_script(title: str, key_points: List[str], concept_text: str) -> str:
@@ -955,7 +885,7 @@ def core_chat(user_id: str, user_message: str) -> Tuple[str, Optional[str]]:
 
 
 # =========================
-# Schemas & Routes
+# Schemas & Routes (web /chat)
 # =========================
 
 class ChatRequest(BaseModel):
@@ -992,11 +922,19 @@ def chat_endpoint(req: ChatRequest) -> ChatResponse:
     return ChatResponse(reply=reply, tts_base64=tts_base64, turn_type=turn_type)
 
 
-# ---------- 新增：給 PlayCanvas 3D Mentor 用的精簡版 endpoint ----------
+# ---------- Day 2：給 PlayCanvas 3D Mentor 用的 Lecture/QA endpoint ----------
+
+class MentorHistoryItem(BaseModel):
+    role: str   # "user" or "assistant"
+    content: str
+
 
 class MentorChatRequest(BaseModel):
-    message: str
-    user_id: Optional[str] = None  # 不傳就用預設 demo user
+    user_id: Optional[str] = None
+    mode: str = "lecture"                 # "lecture" or "qa"
+    topic: str = "dhl_picking_basics"
+    language: str = "en"                  # "en" / "es" / "de" ...
+    history: List[MentorHistoryItem] = []
 
 
 class MentorChatResponse(BaseModel):
@@ -1006,29 +944,86 @@ class MentorChatResponse(BaseModel):
 @app.post("/api/mentor-chat", response_model=MentorChatResponse)
 def mentor_chat_endpoint(req: MentorChatRequest) -> MentorChatResponse:
     """
-    Endpoint for 3D Mentor (PlayCanvas / VIVERSE).
+    Day 2 Mentor NPC endpoint（給 3D Mentor 使用；web 前端仍用 /chat）。
 
-    Request:
-      { "message": "Hello from 3D world" }
+    Request 範例：
+    {
+      "user_id": "player-001",
+      "mode": "lecture",
+      "topic": "dhl_picking_basics",
+      "language": "en",
+      "history": [
+        { "role": "user", "content": "start lecture 1" },
+        { "role": "assistant", "content": "Lecture 1: Today..." }
+      ]
+    }
 
-    Optional:
-      { "message": "...", "user_id": "player-123" }
-
-    Response:
-      { "reply": "..." }  # 已經去掉 HTML，適合直接顯示在 Text 元件
+    Response：
+    { "reply": "Lecture 1: Today we'll walk through..." }
     """
-    user_id = req.user_id or "npc-demo"
 
-    reply, turn_type = core_chat(user_id, req.message)
+    language_name_map = {
+        "en": "English",
+        "es": "Spanish",
+        "de": "German",
+    }
+    language_name = language_name_map.get(req.language, "English")
 
-    # 去掉 HTML，避免 3D UI 出現 <ul><li> 之類標籤
-    plain = re.sub(r"<.*?>", " ", reply)
-    plain = re.sub(r"\s+", " ", plain).strip()
+    if req.mode == "lecture":
+        mode_desc = "You are giving the next short part of a structured lecture."
+    else:
+        mode_desc = "You are clarifying and expanding on the previous explanation in a Q&A style."
 
-    if not plain:
-        plain = reply  # 萬一整個被清空，就退回原始文字
+    system_prompt = f"""You are a 3D Mentor NPC inside a DHL training warehouse.
 
-    return MentorChatResponse(reply=plain)
+Your role:
+- Teach the user step by step.
+- Use simple, spoken-style explanations.
+- Always respond in {language_name}.
+- Current topic: {req.topic}.
+- Current mode: {mode_desc}
+
+Style:
+- Short sentences, natural rhythm.
+- Sound like a real human trainer speaking.
+- No markdown, no bullet points, no headings.
+- 120–220 words per reply.
+"""
+
+    messages: List[Dict[str, str]] = [
+        {"role": "system", "content": system_prompt.strip()}
+    ]
+
+    # history（最近幾句對話，由前端維護）
+    for item in req.history:
+        if item.role not in ("user", "assistant"):
+            continue
+        messages.append({"role": item.role, "content": item.content})
+
+    # mode cue
+    if req.mode == "lecture":
+        messages.append(
+            {
+                "role": "user",
+                "content": "Please continue the lecture with the next short section.",
+            }
+        )
+    else:
+        messages.append(
+            {
+                "role": "user",
+                "content": "Please continue by clarifying or expanding on the last explanation.",
+            }
+        )
+
+    res = client.chat.completions.create(
+        model="gpt-4.1-mini",
+        messages=messages,
+        temperature=0.5,
+    )
+    reply = (res.choices[0].message.content or "").strip()
+
+    return MentorChatResponse(reply=reply)
 
 
 @app.get("/")
@@ -1114,28 +1109,37 @@ def reset_endpoint(req: ResetRequest) -> Dict[str, bool]:
         del SESSIONS[req.user_id]
     return {"ok": True}
 
-from fastapi import Response
-from pydantic import BaseModel
+
+# ---------- Day 2：通用 TTS API（3D Mentor 用） ----------
 
 class TTSRequest(BaseModel):
     text: str
+    language: Optional[str] = "en"
+    voice: Optional[str] = "mentor"  # "mentor" / "mentor_female" / "mentor_soft" / "mentor_story"
+
 
 @app.post("/api/tts")
 async def api_tts(req: TTSRequest):
     """
-    Universal TTS API — front-end 用這個
-    Body: { "text": "Hello world" }
-    回傳: audio/mpeg bytes
+    Universal TTS API — 3D Mentor / 前端都可以用。
+
+    Request:
+      { "text": "...", "language": "en", "voice": "mentor" }
+
+    目前 language 先不分流 provider，主要是 voice 控制音色：
+      - mentor         → onyx
+      - mentor_female  → nova
+      - mentor_soft    → ash
+      - mentor_story   → verse
     """
-    text = req.text.strip()
+    text = (req.text or "").strip()
     if not text:
         return Response(content=b"", media_type="audio/mpeg")
 
-    # 正確：使用 synthesize_speech()
-    audio_bytes = synthesize_speech(text, voice="mentor")
+    voice_id = req.voice or "mentor"
+    audio_bytes = synthesize_speech(text, voice=voice_id)
 
     return Response(
         content=audio_bytes,
         media_type="audio/mpeg"
     )
-
