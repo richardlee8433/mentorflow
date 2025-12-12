@@ -16,6 +16,8 @@ from lesson_content import (
 )
 from lessons import LESSONS  # contains chapter1~5 loaded from JSON
 
+from eval.evaluator_v1 import run_eval
+
 # Lesson progression map for unlock logic
 LESSON_PROGRESSION = {
     "chapter1": "chapter2",
@@ -27,7 +29,7 @@ LESSON_PROGRESSION = {
 # =========================
 # FastAPI app
 # =========================
-app = FastAPI(title="Persona / MentorFlow v0.8 – Teaching API")
+app = FastAPI(title="Persona / MentorFlow v0.90 – Teaching API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # 開發階段先放寬，之後要可以收緊
@@ -475,7 +477,7 @@ def build_lecture_segments(lesson_key: str) -> List[str]:
     """
     Build a small set of 'spoken' lecture segments for the first unit of a lesson.
 
-    v0.8 Podcast Mode:
+    v0.90 Podcast Mode:
     - We call generate_spoken_script(...) once to get a podcast-style script.
     - Then we chunk that script into smaller pieces for "next" navigation.
     - This keeps the flow similar to the old lecture mode, but the content
@@ -885,7 +887,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     reply: str
     tts_base64: Optional[str] = None
-    # v0.8: turn_type for flow-aware UI (intro / reasoning / roleplay / chat / lecture / etc.)
+    # v0.90: turn_type for flow-aware UI (intro / reasoning / roleplay / chat / lecture / etc.)
     turn_type: Optional[str] = None
 
 
@@ -1020,7 +1022,7 @@ def root() -> Dict[str, str]:
     """
     Health check endpoint.
     """
-    return {"status": "ok", "message": "Persona / MentorFlow v0.8 Teaching API running"}
+    return {"status": "ok", "message": "Persona / MentorFlow v0.90 Teaching API running"}
 
 
 @app.get("/health")
@@ -1031,7 +1033,7 @@ def health_check():
     return {
         "status": "ok",
         "service": "mentorflow-backend",
-        "version": "v0.8",
+        "version": "v0.90",
         "region": os.getenv("MENTORFLOW_REGION", "local"),
     }
 
@@ -1131,4 +1133,40 @@ async def api_tts(req: TTSRequest):
     return Response(
         content=audio_bytes,
         media_type="audio/mpeg"
+    )
+
+class EvalRunRequest(BaseModel):
+    model_under_test: Optional[str] = "gpt-4.1-mini"
+    judge_model: Optional[str] = "gpt-4.1-mini"
+    dataset_path: Optional[str] = "eval/dataset_v1.json"
+
+
+class EvalRunResponse(BaseModel):
+    model_under_test: str
+    judge_model: str
+    total_questions: int
+    correct: int
+    accuracy: float
+    elapsed_seconds: float
+
+
+@app.post("/eval/run", response_model=EvalRunResponse)
+def eval_run_endpoint(req: EvalRunRequest) -> EvalRunResponse:
+    """
+    v0.90 – Golden Dataset + Basic Evaluator
+    Run evaluation over the golden dataset and return a summary.
+    """
+    rep = run_eval(
+        model_under_test=req.model_under_test or "gpt-4.1-mini",
+        judge_model=req.judge_model or "gpt-4.1-mini",
+        dataset_path=req.dataset_path or "eval/dataset_v1.json",
+    )
+
+    return EvalRunResponse(
+        model_under_test=rep["model_under_test"],
+        judge_model=rep["judge_model"],
+        total_questions=rep["total_questions"],
+        correct=rep["correct"],
+        accuracy=rep["accuracy"],
+        elapsed_seconds=rep["elapsed_seconds"],
     )

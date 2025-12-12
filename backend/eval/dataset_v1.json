@@ -1,0 +1,122 @@
+[
+  {
+    "id": "c1_q01_tokens_basic",
+    "chapter": "chapter1",
+    "tags": ["tokens", "basics"],
+    "prompt": "In your own words, what is a token in the context of large language models?",
+    "ideal_answer": "A token is a basic unit of text that the model reads and generates, such as a subword, word piece or symbol. Models process input and output as sequences of tokens, not raw characters or full sentences.",
+    "min_score": 1
+  },
+  {
+    "id": "c1_q02_tokens_vs_words",
+    "chapter": "chapter1",
+    "tags": ["tokens", "granularity"],
+    "prompt": "Why do AI PMs need to think in tokens rather than words when estimating cost and limits?",
+    "ideal_answer": "Because pricing, context window limits and latency are all defined in tokens, not words. A single word can be split into multiple tokens, so thinking in tokens gives more accurate estimates of cost and how much content fits into the model context.",
+    "min_score": 1
+  },
+  {
+    "id": "c1_q03_context_window",
+    "chapter": "chapter1",
+    "tags": ["context_window", "limits"],
+    "prompt": "What is a context window and why does it matter for building AI products?",
+    "ideal_answer": "The context window is the maximum number of tokens the model can consider at once, including both input and output. It matters because it limits how much history, documents or instructions you can send, and affects whether the model can see all relevant information at the same time.",
+    "min_score": 1
+  },
+  {
+    "id": "c1_q04_long_context_tradeoff",
+    "chapter": "chapter1",
+    "tags": ["context_window", "tradeoffs"],
+    "prompt": "Name one trade-off when using a very long context window model compared to a shorter one.",
+    "ideal_answer": "Long context models are usually more expensive and sometimes slower than shorter context models. They allow more information per request but increase cost and may not always improve quality if the prompt is poorly structured.",
+    "min_score": 1
+  },
+  {
+    "id": "c1_q05_embeddings_definition",
+    "chapter": "chapter1",
+    "tags": ["embeddings", "definition"],
+    "prompt": "Explain what an embedding is in the context of text and language models.",
+    "ideal_answer": "An embedding is a numerical vector representation of text in a continuous space where similar meanings are close together. Each text piece is mapped to a vector so that semantic similarity becomes geometric closeness in that space.",
+    "min_score": 1
+  },
+  {
+    "id": "c1_q06_embeddings_usecases",
+    "chapter": "chapter1",
+    "tags": ["embeddings", "use_cases"],
+    "prompt": "Give two common product use cases where embeddings are useful for AI PMs.",
+    "ideal_answer": "Typical use cases include semantic search, where you find similar documents or queries using vector similarity, and clustering or recommendations, where you group or suggest items based on embedding similarity. Other examples are deduplication and topic discovery.",
+    "min_score": 1
+  },
+  {
+    "id": "c3_q01_rag_definition",
+    "chapter": "chapter3",
+    "tags": ["rag", "definition"],
+    "prompt": "Briefly define Retrieval-Augmented Generation (RAG).",
+    "ideal_answer": "RAG is a pattern where the system retrieves relevant context from an external knowledge source and feeds it into the model as part of the prompt, so that the answer is grounded in that retrieved context instead of relying only on the model’s internal parameters.",
+    "min_score": 1
+  },
+  {
+    "id": "c3_q02_rag_why_useful",
+    "chapter": "chapter3",
+    "tags": ["rag", "benefits"],
+    "prompt": "Why is RAG often preferred over fine-tuning for knowledge-heavy use cases?",
+    "ideal_answer": "Because RAG lets you keep knowledge in an external store that can be updated without retraining the model. It reduces hallucinations, keeps answers up-to-date, and is usually cheaper and faster to iterate compared to frequent fine-tuning.",
+    "min_score": 1
+  },
+  {
+    "id": "c3_q03_chunking_reason",
+    "chapter": "chapter3",
+    "tags": ["chunking", "documents"],
+    "prompt": "Why do we need to chunk long documents before building a RAG system?",
+    "ideal_answer": "Because long documents exceed a single embedding or context window and can dilute relevance. Chunking splits them into smaller, coherent pieces so that each chunk can be embedded, retrieved and injected precisely, improving relevance and reducing noise.",
+    "min_score": 1
+  },
+  {
+    "id": "c3_q04_chunk_size_tradeoff",
+    "chapter": "chapter3",
+    "tags": ["chunking", "tradeoffs"],
+    "prompt": "Describe one trade-off when choosing chunk size in a RAG system.",
+    "ideal_answer": "If chunks are too small, you lose context and retrieval becomes noisy. If chunks are too large, relevant details are harder to isolate, you waste tokens and may hit context limits. Chunk size is a trade-off between preserving enough context and keeping each chunk focused and compact.",
+    "min_score": 1
+  },
+  {
+    "id": "c3_q05_retrieval_quality",
+    "chapter": "chapter3",
+    "tags": ["retrieval", "quality"],
+    "prompt": "What is retrieval quality in RAG and why does it matter more than just using a stronger model?",
+    "ideal_answer": "Retrieval quality measures whether the system finds the truly relevant chunks for a query. If retrieval is poor, even the strongest model will hallucinate or answer from the wrong context. Good retrieval often improves real-world performance more than simply upgrading to a more powerful model.",
+    "min_score": 1
+  },
+  {
+    "id": "c5_q01_eval_why_needed",
+    "chapter": "chapter5",
+    "tags": ["evaluation", "motivation"],
+    "prompt": "Why is an evaluation system necessary for an AI teaching product like MentorFlow instead of relying only on manual testing?",
+    "ideal_answer": "Because manual testing does not scale and is inconsistent. An evaluation system lets you measure quality repeatedly, compare model or prompt changes over time, detect regressions and make decisions with data instead of intuition. It turns quality from a feeling into a measurable signal.",
+    "min_score": 1
+  },
+  {
+    "id": "c5_q02_golden_dataset_role",
+    "chapter": "chapter5",
+    "tags": ["evaluation", "golden_dataset"],
+    "prompt": "What is a golden dataset and how is it used in evaluation?",
+    "ideal_answer": "A golden dataset is a curated set of representative questions and trusted reference answers that encode what ‘good’ looks like. It is used to consistently test models or configurations so that you can compare performance over time and across versions in a stable, repeatable way.",
+    "min_score": 1
+  },
+  {
+    "id": "c5_q03_eval_vs_accuracy_only",
+    "chapter": "chapter5",
+    "tags": ["evaluation", "metrics"],
+    "prompt": "Why is looking at just a single accuracy number not enough to fully evaluate an AI teaching system?",
+    "ideal_answer": "A single accuracy number hides important details such as which topics fail, what error patterns appear and how explanations feel to learners. You also need to understand failure modes, per-topic performance, reasoning quality and safety, not just overall correctness.",
+    "min_score": 1
+  },
+  {
+    "id": "c5_q04_eval_for_regression",
+    "chapter": "chapter5",
+    "tags": ["evaluation", "regression"],
+    "prompt": "How does an evaluation pipeline help you detect regressions when you change prompts, models or system design?",
+    "ideal_answer": "By running the same golden dataset before and after a change and comparing results. If some questions that used to pass now fail, the pipeline highlights them, so you can see exactly where the system regressed and decide whether to roll back, tweak prompts or adjust the design.",
+    "min_score": 1
+  }
+]
