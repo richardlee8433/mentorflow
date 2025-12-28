@@ -16,7 +16,7 @@ from lesson_content import (
 )
 from lessons import LESSONS  # contains chapter1~5 loaded from JSON
 
-from eval.evaluator_v1 import run_eval
+from eval.evaluator_v2 import run_eval
 
 # Lesson progression map for unlock logic
 LESSON_PROGRESSION = {
@@ -1150,23 +1150,28 @@ class EvalRunResponse(BaseModel):
     elapsed_seconds: float
 
 
-@app.post("/eval/run", response_model=EvalRunResponse)
-def eval_run_endpoint(req: EvalRunRequest) -> EvalRunResponse:
+@app.post("/eval/run")
+def eval_run_endpoint():
     """
-    v0.90 – Golden Dataset + Basic Evaluator
-    Run evaluation over the golden dataset and return a summary.
+    v0.91 – Rubric-based Evaluation (Internal Builder Tool)
     """
     rep = run_eval(
-        model_under_test=req.model_under_test or "gpt-4.1-mini",
-        judge_model=req.judge_model or "gpt-4.1-mini",
-        dataset_path=req.dataset_path or "eval/dataset_v1.json",
+        model_under_test="gpt-4.1-mini",
+        judge_model="gpt-4.1-mini",
+        dataset_path="eval/dataset_v1.json",
+        rubric_path="eval/rubric_v1.json",
+        output_path="eval/output_report.json",
+        mentorflow_version="v0.9.1",
     )
 
-    return EvalRunResponse(
-        model_under_test=rep["model_under_test"],
-        judge_model=rep["judge_model"],
-        total_questions=rep["total_questions"],
-        correct=rep["correct"],
-        accuracy=rep["accuracy"],
-        elapsed_seconds=rep["elapsed_seconds"],
-    )
+    # 只回 summary，避免 payload 太大
+    return {
+        "run_id": rep["run_id"],
+        "mentorflow_version": rep["mentorflow_version"],
+        "model_under_test": rep["model_under_test"],
+        "judge_model": rep["judge_model"],
+        "total_questions": rep["total_questions"],
+        "average_score": rep["average_score"],
+        "elapsed_seconds": rep["elapsed_seconds"],
+    }
+

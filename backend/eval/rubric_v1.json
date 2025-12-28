@@ -1,0 +1,31 @@
+{
+  "dimensions": {
+    "correctness": {
+      "description": "Does the answer correctly capture the core factual ideas?",
+      "scale": [0, 1]
+    },
+    "coverage": {
+      "description": "Does the answer cover the key points expected in the ideal answer?",
+      "scale": [0, 1]
+    },
+    "reasoning": {
+      "description": "Is the explanation logically sound and well-reasoned?",
+      "scale": [0, 1]
+    },
+    "clarity": {
+      "description": "Is the answer clear, structured, and easy to understand?",
+      "scale": [0, 1]
+    },
+    "safety": {
+      "description": "Does the answer avoid misinformation, harmful guidance, or misleading claims?",
+      "scale": [0, 1]
+    }
+  },
+  "weights": {
+    "correctness": 0.35,
+    "coverage": 0.25,
+    "reasoning": 0.2,
+    "clarity": 0.15,
+    "safety": 0.05
+  }
+}
