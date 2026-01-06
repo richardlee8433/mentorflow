@@ -2,12 +2,13 @@ import os
 import re
 import base64
 import hashlib
+import time
 import requests
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Any
 
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from openai import OpenAI
 
 from lesson_content import (
@@ -16,7 +17,8 @@ from lesson_content import (
 )
 from lessons import LESSONS  # contains chapter1~5 loaded from JSON
 
-from eval.evaluator_v2 import run_eval
+# ✅ v0.92: Decision-based evaluation
+from eval.evaluator_v3 import run_eval
 
 # Lesson progression map for unlock logic
 LESSON_PROGRESSION = {
@@ -29,10 +31,10 @@ LESSON_PROGRESSION = {
 # =========================
 # FastAPI app
 # =========================
-app = FastAPI(title="Persona / MentorFlow v0.90 – Teaching API")
+app = FastAPI(title="MentorFlow v0.92 – Teaching API")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 開發階段先放寬，之後要可以收緊
+    allow_origins=["*"],  # dev: open; prod: tighten
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -46,9 +48,7 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # ElevenLabs configuration
 # =========================
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
-# 預設 voice：Rachel（通用 podcast 風格，可用環境變數覆蓋）
 ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
-# 建議模型：multilingual v2
 ELEVENLABS_MODEL_ID = os.getenv("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2")
 
 print("[CFG] ELEVENLABS_API_KEY set:", bool(ELEVENLABS_API_KEY))
@@ -58,6 +58,30 @@ print("[CFG] ELEVENLABS_VOICE_ID:", ELEVENLABS_VOICE_ID)
 # In-memory TTS cache
 # =========================
 TTS_CACHE: Dict[str, bytes] = {}
+
+# =========================
+# In-memory sessions
+# =========================
+SESSIONS: Dict[str, Dict[str, Any]] = {}
+
+
+def get_session(user_id: str) -> Dict[str, Any]:
+    if user_id not in SESSIONS:
+        SESSIONS[user_id] = {
+            "mode": "chat",
+            "history": [],
+            # lesson
+            "current_lesson": None,
+            "current_unit_id": None,
+            "correct_in_lesson": 0,
+            "unlocked_lessons": ["chapter1"],  # v0.8+ curriculum style
+            # role-play
+            "roleplay_node": None,
+            "roleplay_score": 0,
+            "roleplay_done": False,
+        }
+    return SESSIONS[user_id]
+
 
 # =========================
 # New scorer: semantic, key-point based (reasoning-friendly)
@@ -77,7 +101,7 @@ Rules:
    - What is missing or unclear.
    - Use concise, learner-friendly wording.
 6. Your response must be JSON with keys: score, feedback.
-"""
+""".strip()
 
 
 def score_answer(
@@ -85,10 +109,7 @@ def score_answer(
     key_points: List[str],
     learner_answer: str,
     min_points: int,
-) -> Dict[str, str]:
-    """
-    Call OpenAI to semantically score the learner's answer against key points.
-    """
+) -> Dict[str, Any]:
     key_points_text = "\n".join(f"- {kp}" for kp in key_points)
     user_content = f"""
 [Lesson Material]
@@ -96,9 +117,6 @@ def score_answer(
 
 [Key Points]
 {key_points_text}
-
-[Question]
-What is the most important idea here?
 
 [Learner Answer]
 {learner_answer}
@@ -120,12 +138,11 @@ Minimum key points for full score: {min_points}.
     )
     reply = res.choices[0].message.content or ""
 
-    # Attempt to parse JSON-like structure
     match = re.search(r"\{.*\}", reply, re.DOTALL)
     if not match:
         return {
             "score": 0,
-            "feedback": "I could not parse the scorer output. Let's try to focus on the key ideas again.",
+            "feedback": "I could not parse the scorer output. Let's refocus on the key ideas.",
             "raw_reply": reply,
         }
 
@@ -135,74 +152,46 @@ Minimum key points for full score: {min_points}.
         feedback = str(data.get("feedback", "")).strip() or "Thanks for your answer."
     except Exception:
         score = 0
-        feedback = "I could not parse your answer correctly, but let's review the key points again."
+        feedback = "I could not parse the scorer output. Let's review the key points again."
 
-    # Clamp score to [0, 2]
-    if score < 0:
-        score = 0
-    elif score > 2:
-        score = 2
-
-    return {
-        "score": score,
-        "feedback": feedback,
-        "raw_reply": reply,
-    }
+    score = max(0, min(2, score))
+    return {"score": score, "feedback": feedback, "raw_reply": reply}
 
 
 # =========================
-# TTS helper (ElevenLabs + OpenAI fallback)
+# TTS helper (ElevenLabs + fallback)
 # =========================
 
-def synthesize_speech(text: str, voice: str = "sage") -> bytes:
-    """
-    Synthesize speech from text with a simple in-memory mp3 cache.
-
-    - 若有設定 ELEVENLABS_API_KEY → 優先使用 ElevenLabs TTS。
-    - 若 ElevenLabs 失敗或沒設定 → fallback 到 OpenAI TTS (gpt-4o-realtime-preview-tts)。
-    - 以 (provider + model + voice + text) 產生 cache key，重複文字只會扣一次費用。
-
-    voice 參數目前只在 ElevenLabs 時使用；
-    OpenAI 路徑一律用多語 voice "alloy"。
-    """
+def synthesize_speech(text: str) -> bytes:
     text = text.strip()
     if not text:
         return b""
 
-    # ---- 決定 provider 並產生 cache key ----
     if ELEVENLABS_API_KEY and ELEVENLABS_VOICE_ID:
         provider = "elevenlabs"
         model_id = ELEVENLABS_MODEL_ID
         voice_id = ELEVENLABS_VOICE_ID
     else:
         provider = "openai"
-        model_id = "gpt-4o-realtime-preview-tts"
+        model_id = "gpt-4o-mini-tts"
         voice_id = "alloy"
 
     cache_key_src = f"{provider}|{model_id}|{voice_id}|{text}"
     cache_key = hashlib.sha256(cache_key_src.encode("utf-8")).hexdigest()
-
-    # ---- 先看 cache 有沒有 ----
     cached = TTS_CACHE.get(cache_key)
     if cached:
         return cached
 
     audio_bytes: bytes = b""
 
-    # -------------------------
-    # Primary: ElevenLabs TTS
-    # -------------------------
     if provider == "elevenlabs":
         try:
-            print("[TTS] Using ElevenLabs...")
             tts_url = f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}"
-
             headers = {
                 "Accept": "audio/mpeg",
                 "xi-api-key": ELEVENLABS_API_KEY,
                 "Content-Type": "application/json",
             }
-
             payload = {
                 "text": text,
                 "model_id": ELEVENLABS_MODEL_ID,
@@ -213,670 +202,289 @@ def synthesize_speech(text: str, voice: str = "sage") -> bytes:
                     "use_speaker_boost": True,
                 },
             }
-
-            resp = requests.post(
-                tts_url,
-                headers=headers,
-                json=payload,
-                timeout=60,
-            )
-
-            if resp.ok and resp.content:
-                audio_bytes = resp.content
-                print("[TTS] ElevenLabs ok, bytes:", len(audio_bytes))
+            resp = requests.post(tts_url, headers=headers, json=payload, timeout=45)
+            if resp.status_code == 200:
+                audio_bytes = resp.content or b""
             else:
-                print(f"[TTS] ElevenLabs error {resp.status_code}: {resp.text[:200]}")
-        except Exception as exc:
-            print(f"[TTS] ElevenLabs exception: {exc}")
+                print("[TTS] ElevenLabs error:", resp.status_code, resp.text[:200])
+        except Exception as e:
+            print("[TTS] ElevenLabs exception:", e)
 
-    # -------------------------
-    # Fallback: OpenAI TTS (multilingual)
-    # -------------------------
+    # Fallback: OpenAI TTS
     if not audio_bytes:
-        print("[TTS] Falling back to OpenAI TTS (gpt-4o-mini-tts, alloy)")
         try:
             res = client.audio.speech.create(
-                model="gpt-4o-mini-tts",   # ⭐ 最新可用多語 TTS 模型
-                voice="alloy",            # ⭐ 多語
+                model="gpt-4o-mini-tts",
+                voice="alloy",
                 input=text,
                 response_format="mp3",
             )
             audio_bytes = res.content or b""
-        except Exception as exc:
-            print(f"[TTS ERROR] OpenAI fallback failed: {exc}")
+        except Exception as e:
+            print("[TTS] OpenAI fallback error:", e)
             audio_bytes = b""
 
-
-    # ---- 寫入 cache ----
     if audio_bytes:
         TTS_CACHE[cache_key] = audio_bytes
 
     return audio_bytes
 
 
-
-def generate_spoken_script(title: str, key_points: List[str], concept_text: str) -> str:
-    """
-    Generate a podcast-style spoken lecture script.
-    """
-    points_text = "\n".join(key_points) if key_points else "None"
-
-    prompt = f"""
-You are a podcast host and an experienced AI product instructor.
-Rewrite the following material into a natural, podcast-style spoken script.
-
-Topic:
-{title}
-
-Key points to cover:
-{points_text}
-
-Concept explanation:
-{concept_text}
-
-Tone and Style:
-- Warm, confident, slightly energetic — like a real podcast host.
-- Short sentences. Natural rhythm.
-- Use conversational transitions like:
-  "Let’s break this down.",
-  "Here’s where it gets interesting.",
-  "You might think this is obvious, but…",
-  "Now, why does this matter?"
-- Allow small pauses using commas, ellipses (...), and occasional em-dash (—).
-- Include light rhetorical questions.
-- Avoid robotic or academic tone.
-
-Structure:
-1. A short narrative opening that sets the scene.
-2. A smooth transition into the main idea.
-3. Explanation with small examples or analogies.
-4. Clarify one or two common misconceptions.
-5. End with a clear, strong takeaway.
-
-Constraints:
-- No markdown.
-- No bullet points.
-- No headings.
-- No list formatting.
-- 230–320 words.
-- Output must sound natural when read aloud by TTS.
-
-Your goal:
-Make the listener feel like they’re hearing a real human host explain an idea clearly and engagingly.
-"""
-
-    try:
-        res = client.chat.completions.create(
-            model="gpt-4.1",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.9,
-        )
-        script = res.choices[0].message.content or ""
-        return script.strip()
-    except Exception as exc:
-        print(f"[LECTURE SCRIPT ERROR] {exc}")
-        # fallback: use original concept text
-        return concept_text.strip()
-
-
 # =========================
-# In-memory sessions
+# Lesson helpers (JSON-based)
 # =========================
 
-SESSIONS: Dict[str, Dict] = {}
+def get_lesson(lesson_key: str) -> Dict[str, Any]:
+    lesson = LESSONS.get(lesson_key)
+    if not lesson:
+        raise KeyError(f"Lesson '{lesson_key}' not found.")
+    return lesson
 
 
-def get_session(user_id: str) -> Dict:
-    """
-    Get or create session for a user.
-    """
-    if user_id not in SESSIONS:
-        SESSIONS[user_id] = {
-            "mode": "chat",  # chat / lesson / roleplay / lecture
-            "current_lesson": None,
-            "current_unit_id": None,
-            "correct_in_lesson": 0,
-            "unlocked_lessons": ["chapter1"],
-            "lecture_lesson": None,
-            "lecture_segments": [],
-            "lecture_index": 0,
-            "roleplay_node": None,
-            "roleplay_score": 0,
-            "roleplay_done": False,
-        }
-    return SESSIONS[user_id]
-
-
-# =========================
-# Lesson access helpers
-# =========================
-
-def get_lesson(lesson_key: str) -> Dict:
-    if lesson_key not in LESSONS:
-        raise KeyError(f"Unknown lesson key: {lesson_key}")
-    return LESSONS[lesson_key]
-
-
-def get_first_unit(lesson_key: str) -> Dict:
+def get_unit(lesson_key: str, unit_id: str) -> Dict[str, Any]:
     lesson = get_lesson(lesson_key)
-    units = lesson["units"]
-    # list-based structure (chapter JSON)
-    if isinstance(units, list):
-        return units[0]
-    # dict-based fallback
-    first_key = sorted(units.keys())[0]
-    return units[first_key]
+    for unit in lesson["units"]:
+        if unit["id"] == unit_id:
+            return unit
+    raise KeyError(f"Unit '{unit_id}' not found in lesson '{lesson_key}'.")
 
 
-def get_unit(lesson_key: str, unit_id: str) -> Dict:
+def get_first_unit(lesson_key: str) -> Dict[str, Any]:
     lesson = get_lesson(lesson_key)
-    units = lesson["units"]
-    if isinstance(units, list):
-        idx = int(unit_id)
-        return units[idx]
-    return units[unit_id]
+    return lesson["units"][0]
 
 
-def get_next_unit_id(lesson_key: str, current_unit_id: str) -> Optional[str]:
-    lesson = get_lesson(lesson_key)
-    units = lesson["units"]
+def start_lesson(user_id: str, lesson_key: str) -> str:
+    s = get_session(user_id)
 
-    if isinstance(units, list):
-        idx = int(current_unit_id)
-        if idx + 1 < len(units):
-            return str(idx + 1)
-        return None
+    if lesson_key not in s["unlocked_lessons"]:
+        return f"Lesson '{lesson_key}' is locked. Please complete previous lessons first."
 
-    keys = sorted(units.keys())
-    idx = keys.index(current_unit_id)
-    if idx + 1 < len(keys):
-        return keys[idx + 1]
-    return None
-
-
-def render_key_points_html(key_points: List[str]) -> str:
-    if not key_points:
-        return ""
-    return "<ul>" + "".join(f"<li>{kp}</li>" for kp in key_points) + "</ul>"
-
-
-# =========================
-# Lesson engine (Flow v2)
-# =========================
-
-def start_lesson(user_id: str, lesson_key: str) -> Tuple[str, str]:
-    """
-    Start a lesson for a given chapter key, resetting progress.
-    """
-    session = get_session(user_id)
-
-    if lesson_key not in session["unlocked_lessons"]:
-        return (
-            f"This lesson is currently locked. "
-            f"Complete previous chapters before starting {lesson_key}.",
-            "locked",
-        )
-
-    lesson = get_lesson(lesson_key)
     first_unit = get_first_unit(lesson_key)
 
-    session["mode"] = "lesson"
-    session["current_lesson"] = lesson_key
-    session["current_unit_id"] = "0"  # works for list-based units
-    session["correct_in_lesson"] = 0
+    s["mode"] = "lesson"
+    s["current_lesson"] = lesson_key
+    s["current_unit_id"] = first_unit["id"]
+    s["correct_in_lesson"] = 0
 
-    key_points = first_unit.get("key_points") or []
-    key_idea = key_points[0] if key_points else ""
-
-    lines = [
-        "🎓 Lesson Intro",
-        f"You are starting: {lesson['title']}",
-        "In this lesson, we will walk through key concepts step by step.",
-        "",
-        "✨ Key Idea",
-        f"- {key_idea}",
-        "",
-        "📖 Concept",
-        first_unit["material"],
-        "",
-        "❓ Check your understanding",
-        first_unit["question"],
-    ]
-
-    reply = "\n".join(lines)
-    return reply, "intro"
-
-
-def _chunk_for_lecture(text: str, max_chars: int = 520) -> List[str]:
-    """
-    Split a long text into smaller chunks suitable for lecture-style TTS.
-    Pure text splitting – no extra LLM calls.
-    """
-    words = text.split()
-    segments: List[str] = []
-    current: List[str] = []
-    length = 0
-
-    for w in words:
-        wlen = len(w) + 1  # space
-        if length + wlen > max_chars and current:
-            segments.append(" ".join(current))
-            current = [w]
-            length = wlen
-        else:
-            current.append(w)
-            length += wlen
-
-    if current:
-        segments.append(" ".join(current))
-
-    return segments
-
-
-def build_lecture_segments(lesson_key: str) -> List[str]:
-    """
-    Build a small set of 'spoken' lecture segments for the first unit of a lesson.
-
-    v0.90 Podcast Mode:
-    - We call generate_spoken_script(...) once to get a podcast-style script.
-    - Then we chunk that script into smaller pieces for "next" navigation.
-    - This keeps the flow similar to the old lecture mode, but the content
-      is optimized for audio.
-    """
     lesson = get_lesson(lesson_key)
-    first_unit = get_first_unit(lesson_key)
-
-    title = lesson.get("title", lesson_key)
-    key_points = first_unit.get("key_points") or []
-    concept_text = first_unit.get("material", "")
-
-    # 1) Generate a spoken-style script for this lecture
-    script = generate_spoken_script(title, key_points, concept_text)
-
-    # 2) Split into manageable segments for TTS playback
-    chunks = _chunk_for_lecture(script, max_chars=520)
-    segments: List[str] = []
-    total = len(chunks)
-
-    for idx, chunk in enumerate(chunks, start=1):
-        header = f"🎙️ Lecture — part {idx} of {total}" if total > 1 else "🎙️ Lecture"
-        segments.append(f"{header}\n{chunk}")
-
-    # 3) Final wrap-up segment
-    wrap_lines = [
-        "✅ That’s the end of this mini-lecture.",
-        "Next, you can switch into interactive practice to check your understanding.",
-        "When you are ready, type: start lesson 1, or ask any question about what you just heard.",
-    ]
-    segments.append("\n".join(wrap_lines))
-
-    return segments
-
-
-def start_lecture(user_id: str, lesson_key: str) -> Tuple[str, str]:
-    """
-    Start lecture mode for a given lesson.
-
-    - Uses pre-built segments based on the first unit.
-    """
-    session = get_session(user_id)
-
-    # unlock check – same as start_lesson
-    if lesson_key not in session["unlocked_lessons"]:
-        return (
-            f"This lecture is locked. Complete previous chapters before starting {lesson_key}.",
-            "locked",
-        )
-
-    segments = build_lecture_segments(lesson_key)
-
-    session["mode"] = "lecture"
-    session["lecture_lesson"] = lesson_key
-    session["lecture_segments"] = segments
-    session["lecture_index"] = 0
-
-    first_segment = segments[0]
-    reply_lines = [
-        first_segment,
-        "",
-        '▶️ Type "next" when you want to continue the lecture, or ask a question anytime.',
-        'You can also type "stop lesson" to exit back to general Q&A.',
-    ]
-    reply = "\n".join(reply_lines)
-    return reply, "lecture"
-
-
-def continue_lecture(user_id: str, user_message: str) -> Tuple[str, str]:
-    """
-    Continue the current lecture.
-
-    - If the user types 'next' → move to the next segment.
-    - If the user asks a question → answer using general chat, but stay in lecture mode.
-    """
-    session = get_session(user_id)
-
-    lesson_key = session.get("lecture_lesson")
-    segments = session.get("lecture_segments") or []
-    idx = int(session.get("lecture_index", 0))
-
-    if not lesson_key or not segments:
-        # Fallback: nothing to continue
-        session["mode"] = "chat"
-        session["lecture_lesson"] = None
-        session["lecture_segments"] = []
-        session["lecture_index"] = 0
-        return (
-            "There is no active lecture. Type `start lecture 1` to begin the first lecture.",
-            "chat",
-        )
-
-    text = user_message.strip()
-    lowered = text.lower()
-
-    # If the user explicitly asks for the next chunk
-    if lowered in ["next", "continue", "n"]:
-        idx += 1
-        if idx >= len(segments):
-            # End of lecture
-            session["mode"] = "chat"
-            session["lecture_lesson"] = None
-            session["lecture_segments"] = []
-            session["lecture_index"] = 0
-            return (
-                "✅ That’s the end of the lecture. You can now type `start lesson 1` "
-                "to practice interactively, or ask follow-up questions.",
-                "lecture",
-            )
-        session["lecture_index"] = idx
-        reply_lines = [
-            segments[idx],
-            "",
-            '▶️ Type "next" for the following part, or `stop lesson` to exit.',
-        ]
-        reply = "\n".join(reply_lines)
-        return reply, "lecture"
-
-    # Otherwise, treat as a question during lecture
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "You are an AI instructor answering questions during a lecture. "
-                f"Current lesson: {lesson_key}. Respond concisely and clearly."
-            ),
-        },
-        {"role": "user", "content": user_message},
-    ]
-    res = client.chat.completions.create(
-        model="gpt-4.1-mini",
-        messages=messages,
+    return (
+        f"📘 Starting {lesson_key}: {lesson['title']}\n\n"
+        f"Topic: {first_unit['title']}\n\n"
+        f"{first_unit['material']}\n\n"
+        f"Question: {first_unit['question']}"
     )
-    reply = res.choices[0].message.content or ""
-    return reply, "lecture"
 
 
-def continue_lesson(user_id: str, user_message: str) -> Tuple[str, str]:
-    """
-    Handle learner's answer for the current lesson unit and progress to next unit.
-    """
-    session = get_session(user_id)
-    lesson_key = session.get("current_lesson")
-    unit_id = session.get("current_unit_id")
+def maybe_unlock_next_lesson(s: Dict[str, Any], completed_lesson_key: str) -> None:
+    next_lesson = LESSON_PROGRESSION.get(completed_lesson_key)
+    if not next_lesson:
+        return
+    unlocked = set(s.get("unlocked_lessons", []))
+    unlocked.add(next_lesson)
+    s["unlocked_lessons"] = list(unlocked)
 
-    if not lesson_key or unit_id is None:
-        session["mode"] = "chat"
-        return (
-            "You’re not currently in a lesson. Type `start lesson 1` to begin Chapter 1.",
-            "chat",
-        )
 
-    try:
-        unit = get_unit(lesson_key, unit_id)
-    except KeyError:
-        session["mode"] = "chat"
-        session["current_lesson"] = None
-        session["current_unit_id"] = None
-        return (
-            "Current lesson unit not found. Please restart the lesson.",
-            "error",
-        )
+def continue_lesson(user_id: str, user_message: str) -> str:
+    s = get_session(user_id)
+    lesson_key = s.get("current_lesson")
+    unit_id = s.get("current_unit_id")
 
+    if not lesson_key or not unit_id:
+        s["mode"] = "chat"
+        return "No lesson is in progress. Type `start chapter1` (or other unlocked chapter)."
+
+    unit = get_unit(lesson_key, unit_id)
+
+    # Score the learner response
     result = score_answer(
         material=unit["material"],
         key_points=unit["key_points"],
         learner_answer=user_message,
         min_points=unit["min_points"],
     )
-    score = int(result["score"])
-    session["correct_in_lesson"] = int(session.get("correct_in_lesson", 0)) + score
+    s["correct_in_lesson"] = int(s.get("correct_in_lesson", 0)) + result["score"]
 
     feedback = result["feedback"] or "Thanks for your answer."
-    key_points_text = render_key_points_html(unit["key_points"])
+    lesson = get_lesson(lesson_key)
+    next_unit_id = unit.get("next_unit")
 
-    response_parts: List[str] = []
+    # HTML-ish formatting (kept from your v0.91 file)
+    key_points_formatted = "<ul>" + "".join(f"<li>{kp}</li>" for kp in unit["key_points"]) + "</ul>"
+    response_text = (
+        "📘 <b>Your Answer Review</b><br>"
+        f"{feedback}<br><br>"
+        "-----<br><br>"
+        "<b>📌 Key Concepts from this Unit</b><br>"
+        f"{key_points_formatted}<br>"
+    )
 
-    response_parts.append("📘 Your Answer Review")
-    response_parts.append(feedback)
-    response_parts.append("")
-    response_parts.append("💡 Key Points to Remember")
-    response_parts.append(key_points_text)
-    response_parts.append("")
+    if not next_unit_id:
+        response_text += (
+            "-----<br><br>"
+            f"🎉 <b>You’ve completed {lesson_key}: {lesson['title']}!</b><br>"
+        )
+        # unlock next
+        maybe_unlock_next_lesson(s, lesson_key)
 
-    # Determine if there is a next unit
-    next_unit_id = get_next_unit_id(lesson_key, unit_id)
+        # reset state
+        s["mode"] = "chat"
+        s["current_lesson"] = None
+        s["current_unit_id"] = None
+        return response_text
 
-    if next_unit_id is None:
-        # Lesson completed
-        response_parts.append("🎉 You’ve reached the end of this lesson.")
-
-        # Unlock next lesson if defined
-        next_lesson = LESSON_PROGRESSION.get(lesson_key)
-        if next_lesson and next_lesson not in session["unlocked_lessons"]:
-            session["unlocked_lessons"].append(next_lesson)
-            response_parts.append(
-                f"🔓 Next lesson unlocked: {next_lesson}. "
-                f"Type `start lesson {next_lesson[-1]}` to continue."
-            )
-
-        session["mode"] = "chat"
-        session["current_lesson"] = None
-        session["current_unit_id"] = None
-
-        reply = "\n".join(response_parts)
-        return reply, "reasoning"
-
-    # Move to the next unit
-    session["current_unit_id"] = next_unit_id
+    s["current_unit_id"] = next_unit_id
     next_unit = get_unit(lesson_key, next_unit_id)
 
-    response_parts.append("-----")
-    response_parts.append("📖 Next Concept")
-    response_parts.append(next_unit["material"])
-    response_parts.append("")
-    response_parts.append("❓ Check your understanding")
-    response_parts.append(next_unit["question"])
-
-    reply = "\n".join(response_parts)
-    return reply, "reasoning"
-
-
-def start_lesson1(user_id: str) -> Tuple[str, str]:
-    """
-    Shortcut to start Chapter 1 (AI PM – Tokens, Embeddings, Context Windows).
-    """
-    return start_lesson(user_id, "chapter1")
-
-
-def start_lesson2(user_id: str) -> Tuple[str, str]:
-    """
-    Shortcut to start Chapter 2 (Prompting Fundamentals).
-    """
-    return start_lesson(user_id, "chapter2")
+    response_text += (
+        "-----<br><br>"
+        f"➡️ <b>Next Topic: {next_unit['title']}</b><br><br>"
+        f"📖 <b>Concept</b><br>{next_unit['material']}<br><br>"
+        f"❓ <b>Question</b><br>{next_unit['question']}"
+    )
+    return response_text
 
 
 # =========================
 # Role-play engine
 # =========================
 
-def start_roleplay(user_id: str) -> Tuple[str, str]:
-    """
-    Start the role-play scenario.
-    """
-    session = get_session(user_id)
-    session["mode"] = "roleplay"
-    session["roleplay_node"] = "intro"
-    session["roleplay_score"] = 0
-    session["roleplay_done"] = False
+def start_roleplay(user_id: str) -> str:
+    s = get_session(user_id)
+    s["mode"] = "roleplay"
+    s["roleplay_node"] = "intro"
+    s["roleplay_score"] = 0
+    s["roleplay_done"] = False
 
     first = next(n for n in ROLEPLAY_SCENARIO["nodes"] if n["id"] == "intro")
-    intro_text = f"🎭 Role-play: {ROLEPLAY_SCENARIO['title']}\n\n" + first["npc"]
-    return intro_text, "roleplay"
+    return f"🎭 Role-play: {ROLEPLAY_SCENARIO['title']}\n\n" + first["npc"]
 
 
-def handle_roleplay(user_id: str, user_message: str) -> Tuple[str, str]:
-    """
-    Handle one turn of role-play.
-    """
-    session = get_session(user_id)
-    if session.get("roleplay_done"):
-        return (
-            "This session is already completed. Type `start roleplay` to begin a new one.",
-            "roleplay",
-        )
+def handle_roleplay(user_id: str, user_message: str) -> str:
+    s = get_session(user_id)
+    if s.get("roleplay_done"):
+        return "This session is already completed. Type `start roleplay` to begin a new one."
 
-    node_id = session.get("roleplay_node") or "intro"
+    node_id = s.get("roleplay_node") or "intro"
     node = next(n for n in ROLEPLAY_SCENARIO["nodes"] if n["id"] == node_id)
 
-    # Terminal node
     if node.get("type") == "terminal":
         if user_message.strip().lower() in ["finish", "done", "end"]:
-            session["roleplay_done"] = True
-            passed = session["roleplay_score"] >= ROLEPLAY_SCENARIO["passing_score"]
-            text = (
-                f"🎯 Completed! Score {session['roleplay_score']}/"
-                f"{ROLEPLAY_SCENARIO['passing_score']} — "
-            ) + (
-                "✅ Passed!"
-                if passed
-                else "❌ Not passed. Type `start roleplay` to try again."
+            s["roleplay_done"] = True
+            passed = s["roleplay_score"] >= ROLEPLAY_SCENARIO["passing_score"]
+            return (
+                f"🎯 Completed! Score {s['roleplay_score']}/{ROLEPLAY_SCENARIO['passing_score']} — "
+                + ("✅ Passed!" if passed else "❌ Not passed. Type `start roleplay` to try again.")
             )
-            return text, "roleplay"
-        return ("Type `finish` to end and calculate your score.", "roleplay")
+        return "Type `finish` to end and calculate your score."
 
     feedback_lines: List[str] = []
 
-    # Score choices if any
-    for rule in node.get("scoring_rules", []):
-        pattern = rule["pattern"].lower()
-        if pattern in user_message.lower():
-            session["roleplay_score"] += rule["score_delta"]
-            feedback_lines.append(rule["feedback"])
+    if node["type"] == "open":
+        gained = score_open_answer(user_message, node["key_points"])
+        s["roleplay_score"] += gained
 
-    # Next node
-    next_id = node.get("next_id")
-    if not next_id:
-        # No next node => mark as done
-        session["roleplay_done"] = True
-        passed = session["roleplay_score"] >= ROLEPLAY_SCENARIO["passing_score"]
-        text = (
-            f"🎯 Completed! Score {session['roleplay_score']}/"
-            f"{ROLEPLAY_SCENARIO['passing_score']} — "
-        ) + (
-            "✅ Passed!"
-            if passed
-            else "❌ Not passed. Type `start roleplay` to try again."
-        )
-        return text, "roleplay"
+        if gained:
+            feedback_lines.append("👍 Good reasoning.")
+        else:
+            feedback_lines.append("📌 You may have missed some key points.")
+            if node.get("key_points"):
+                bullets = "\n".join([f"- {kp}" for kp in node["key_points"]])
+                feedback_lines.append("Here are the key points to cover:\n" + bullets)
+            if node.get("model_answer"):
+                feedback_lines.append("A concise model answer:\n" + node["model_answer"])
 
+        next_id = node["next"]
+
+    elif node["type"] == "choice":
+        chosen = None
+        try:
+            idx = int(user_message.strip()) - 1
+            if 0 <= idx < len(node["choices"]):
+                chosen = node["choices"][idx]
+        except Exception:
+            pass
+
+        if not chosen:
+            for c in node["choices"]:
+                if c["label"].lower() in user_message.lower():
+                    chosen = c
+                    break
+
+        if not chosen:
+            opts = "\n".join([f"{i+1}) {c['label']}" for i, c in enumerate(node["choices"])])
+            return f"Please select one option:\n{opts}"
+
+        s["roleplay_score"] += chosen.get("score", 0)
+        if "explain" in node:
+            feedback_lines.append(node["explain"])
+        next_id = chosen["next"]
+
+    else:
+        next_id = node["next"]
+
+    s["roleplay_node"] = next_id
     next_node = next(n for n in ROLEPLAY_SCENARIO["nodes"] if n["id"] == next_id)
-    session["roleplay_node"] = next_id
 
-    text_parts = []
-    if feedback_lines:
-        text_parts.append("📝 Feedback on your response:")
-        text_parts.extend(feedback_lines)
-        text_parts.append("")
-
-    text_parts.append(next_node["npc"])
-    text = "\n".join(text_parts)
-    return text, "roleplay"
+    feedback = ("\n".join(feedback_lines) + "\n") if feedback_lines else ""
+    return feedback + next_node["npc"]
 
 
 # =========================
 # Core chat router
 # =========================
 
-def core_chat(user_id: str, user_message: str) -> Tuple[str, Optional[str]]:
-    """
-    Route user messages to:
-    - commands (start lesson / roleplay / lecture / stop lesson)
-    - lesson engine (Flow v2 + reasoning)
-    - role-play engine
-    - lecture engine (podcast-style)
-    - general chat
-    """
-    session = get_session(user_id)
-    text = user_message.strip()
-    lowered = text.lower()
+def core_chat(user_id: str, user_message: str) -> str:
+    s = get_session(user_id)
+    text = user_message.strip().lower()
 
-    # -------- Global stop command --------
-    if lowered in ["stop lesson", "exit lesson", "end lesson"]:
-        session.update(
+    # Commands
+    if text in ["start roleplay", "start role-play"]:
+        return start_roleplay(user_id)
+
+    # v0.8+ chapters
+    if text in ["start chapter1", "start chapter 1"]:
+        return start_lesson(user_id, "chapter1")
+    if text in ["start chapter2", "start chapter 2"]:
+        return start_lesson(user_id, "chapter2")
+    if text in ["start chapter3", "start chapter 3"]:
+        return start_lesson(user_id, "chapter3")
+    if text in ["start chapter4", "start chapter 4"]:
+        return start_lesson(user_id, "chapter4")
+    if text in ["start chapter5", "start chapter 5"]:
+        return start_lesson(user_id, "chapter5")
+
+    if text in ["stop lesson", "exit lesson", "end lesson"]:
+        s.update(
             {
                 "mode": "chat",
+                "history": [],
                 "current_lesson": None,
                 "current_unit_id": None,
                 "correct_in_lesson": 0,
-                "lecture_lesson": None,
-                "lecture_segments": [],
-                "lecture_index": 0,
-                "roleplay_node": None,
-                "roleplay_done": False,
             }
         )
-        return "🛑 Lesson / lecture mode ended. Back to general Q&A.", "chat"
+        return "🛑 Lesson mode ended. Back to general Q&A."
 
-    # -------- Explicit commands --------
-    # Role-play
-    if lowered in ["start roleplay", "start role-play"]:
-        return start_roleplay(user_id)
-
-    # Lecture
-    if lowered in ["start lecture 1", "start lecture1", "lecture 1"]:
-        return start_lecture(user_id, "chapter1")
-    if lowered in ["start lecture 2", "start lecture2", "lecture 2"]:
-        return start_lecture(user_id, "chapter2")
-
-    # Lessons
-    if lowered in ["start lesson 1", "start lesson1"]:
-        return start_lesson1(user_id)
-    if lowered in ["start lesson 2", "start lesson2"]:
-        return start_lesson2(user_id)
-
-    # -------- Mode dispatch (stateful) --------
-    mode = session.get("mode", "chat")
-    if mode == "roleplay":
+    if s["mode"] == "roleplay":
         return handle_roleplay(user_id, user_message)
-    if mode == "lecture":
-        return continue_lecture(user_id, user_message)
-    if mode == "lesson":
+
+    if s["mode"] == "lesson":
         return continue_lesson(user_id, user_message)
 
-    # -------- Default general chat --------
-    messages = [
-        {"role": "system", "content": "You are a helpful teaching assistant."},
-        {"role": "user", "content": user_message},
-    ]
+    # Default general chat
     res = client.chat.completions.create(
         model="gpt-4.1-mini",
-        messages=messages,
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": user_message},
+        ],
     )
-    reply = res.choices[0].message.content
-    return reply, "chat"
+    return res.choices[0].message.content or ""
 
 
 # =========================
-# Schemas & Routes (web /chat)
+# Schemas & Routes
 # =========================
 
 class ChatRequest(BaseModel):
@@ -887,155 +495,25 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     reply: str
     tts_base64: Optional[str] = None
-    # v0.90: turn_type for flow-aware UI (intro / reasoning / roleplay / chat / lecture / etc.)
-    turn_type: Optional[str] = None
 
 
 @app.post("/chat", response_model=ChatResponse)
-def chat_endpoint(req: ChatRequest) -> ChatResponse:
-    """
-    Main chat endpoint.
+def chat_endpoint(req: ChatRequest):
+    reply = core_chat(req.user_id, req.message)
 
-    - Routes the message through core_chat().
-    - Generates TTS audio for the (HTML-stripped) reply.
-    """
-    # 1) Route to core engine
-    reply, turn_type = core_chat(req.user_id, req.message)
-
-    # 2) Prepare plain text for TTS (strip HTML tags)
+    # strip HTML for speech
     tts_text = re.sub(r"<.*?>", " ", reply)
     tts_text = re.sub(r"\s+", " ", tts_text).strip()
 
-    # 3) Call TTS
     audio_bytes = synthesize_speech(tts_text) if tts_text else b""
     tts_base64 = base64.b64encode(audio_bytes).decode("utf-8") if audio_bytes else None
 
-    return ChatResponse(reply=reply, tts_base64=tts_base64, turn_type=turn_type)
-
-
-# ---------- Day 2：給 PlayCanvas 3D Mentor 用的 Lecture/QA endpoint ----------
-
-class MentorHistoryItem(BaseModel):
-    role: str   # "user" or "assistant"
-    content: str
-
-
-class MentorChatRequest(BaseModel):
-    user_id: Optional[str] = None
-    mode: str = "lecture"                 # "lecture" or "qa"
-    topic: str = "dhl_picking_basics"
-    language: str = "en"                  # "en" / "es" / "de" ...
-    history: List[MentorHistoryItem] = []
-
-
-class MentorChatResponse(BaseModel):
-    reply: str
-
-
-@app.post("/api/mentor-chat", response_model=MentorChatResponse)
-def mentor_chat_endpoint(req: MentorChatRequest) -> MentorChatResponse:
-    """
-    Day 2 Mentor NPC endpoint（給 3D Mentor 使用；web 前端仍用 /chat）。
-
-    Request 範例：
-    {
-      "user_id": "player-001",
-      "mode": "lecture",
-      "topic": "dhl_picking_basics",
-      "language": "en",
-      "history": [
-        { "role": "user", "content": "start lecture 1" },
-        { "role": "assistant", "content": "Lecture 1: Today..." }
-      ]
-    }
-
-    Response：
-    { "reply": "Lecture 1: Today we'll walk through..." }
-    """
-
-    language_name_map = {
-        "en": "English",
-        "es": "Spanish",
-        "de": "German",
-    }
-    language_name = language_name_map.get(req.language, "English")
-
-    if req.mode == "lecture":
-        mode_desc = "You are giving the next short part of a structured lecture."
-    else:
-        mode_desc = "You are clarifying and expanding on the previous explanation in a Q&A style."
-
-    system_prompt = f"""You are a 3D Mentor NPC inside a DHL training warehouse.
-
-Your role:
-- Teach the user step by step.
-- Use simple, spoken-style explanations.
-- Always respond in {language_name}.
-- Current topic: {req.topic}.
-- Current mode: {mode_desc}
-
-Style:
-- Short sentences, natural rhythm.
-- Sound like a real human trainer speaking.
-- No markdown, no bullet points, no headings.
-- 120–220 words per reply.
-"""
-
-    messages: List[Dict[str, str]] = [
-        {"role": "system", "content": system_prompt.strip()}
-    ]
-
-    # history（最近幾句對話，由前端維護）
-    for item in req.history:
-        if item.role not in ("user", "assistant"):
-            continue
-        messages.append({"role": item.role, "content": item.content})
-
-    # mode cue
-    if req.mode == "lecture":
-        messages.append(
-            {
-                "role": "user",
-                "content": "Please continue the lecture with the next short section.",
-            }
-        )
-    else:
-        messages.append(
-            {
-                "role": "user",
-                "content": "Please continue by clarifying or expanding on the last explanation.",
-            }
-        )
-
-    res = client.chat.completions.create(
-        model="gpt-4.1-mini",
-        messages=messages,
-        temperature=0.5,
-    )
-    reply = (res.choices[0].message.content or "").strip()
-
-    return MentorChatResponse(reply=reply)
+    return ChatResponse(reply=reply, tts_base64=tts_base64)
 
 
 @app.get("/")
-def root() -> Dict[str, str]:
-    """
-    Health check endpoint.
-    """
-    return {"status": "ok", "message": "Persona / MentorFlow v0.90 Teaching API running"}
-
-
-@app.get("/health")
-def health_check():
-    """
-    Simple health endpoint for uptime checks.
-    """
-    return {
-        "status": "ok",
-        "service": "mentorflow-backend",
-        "version": "v0.90",
-        "region": os.getenv("MENTORFLOW_REGION", "local"),
-    }
+def root():
+    return {"status": "ok", "message": "MentorFlow v0.92 Teaching API running"}
 
 
 class ReportRequest(BaseModel):
@@ -1051,38 +529,15 @@ class ReportResponse(BaseModel):
 
 
 @app.post("/report", response_model=ReportResponse)
-def report_endpoint(req: ReportRequest) -> ReportResponse:
-    """
-    Simple progress report for the front-end status bar.
-    """
-    session = get_session(req.user_id)
-    passed_roleplay = int(
-        session["roleplay_score"] >= ROLEPLAY_SCENARIO["passing_score"]
-    )
-
-    # Rough heuristic: assume 5 units per lesson for now
-    lesson_key = session.get("current_lesson")
-    if lesson_key:
-        lesson = get_lesson(lesson_key)
-        units = lesson["units"]
-        total_units = len(units) if isinstance(units, list) else len(units.keys())
-        current_idx = int(session.get("current_unit_id") or 0)
-        lesson_progress = int((current_idx + 1) / max(total_units, 1) * 100)
-    else:
-        lesson_progress = 0
-
-    progress = min(
-        100,
-        lesson_progress
-        + passed_roleplay * 20
-        + len(session["unlocked_lessons"]) * 10,
-    )
-
+def report_endpoint(req: ReportRequest):
+    s = get_session(req.user_id)
+    passed_roleplay = int(s["roleplay_score"] >= ROLEPLAY_SCENARIO["passing_score"])
+    progress = min(100, 20 + s["correct_in_lesson"] * 10 + passed_roleplay * 40)
     return ReportResponse(
-        mode=session["mode"],
-        correct_in_lesson=session["correct_in_lesson"],
-        unlocked_lessons=session["unlocked_lessons"],
-        roleplay_score=session["roleplay_score"],
+        mode=s["mode"],
+        correct_in_lesson=s["correct_in_lesson"],
+        unlocked_lessons=s["unlocked_lessons"],
+        roleplay_score=s["roleplay_score"],
         progress_percent=progress,
     )
 
@@ -1092,86 +547,83 @@ class ResetRequest(BaseModel):
 
 
 @app.post("/reset")
-def reset_endpoint(req: ResetRequest) -> Dict[str, bool]:
-    """
-    Reset all progress for a user (lessons + role-play).
-    """
+def reset_endpoint(req: ResetRequest):
     if req.user_id in SESSIONS:
         del SESSIONS[req.user_id]
     return {"ok": True}
 
 
-# ---------- Day 2：通用 TTS API（3D Mentor 用） ----------
-
-class TTSRequest(BaseModel):
-    text: str
-    language: Optional[str] = "en"
-    voice: Optional[str] = "mentor"  # "mentor" / "mentor_female" / "mentor_soft" / "mentor_story"
-
-
-@app.post("/api/tts")
-async def api_tts(req: TTSRequest):
-    """
-    Universal TTS API — 3D Mentor / 前端都可以用。
-
-    Request:
-      { "text": "...", "language": "en", "voice": "mentor" }
-
-    目前 language 先不分流 provider，主要是 voice 控制音色：
-      - mentor         → onyx
-      - mentor_female  → nova
-      - mentor_soft    → ash
-      - mentor_story   → verse
-    """
-    text = (req.text or "").strip()
-    if not text:
-        return Response(content=b"", media_type="audio/mpeg")
-
-    voice_id = req.voice or "mentor"
-    audio_bytes = synthesize_speech(text, voice=voice_id)
-
-    return Response(
-        content=audio_bytes,
-        media_type="audio/mpeg"
-    )
+# =========================
+# v0.92 Evaluation Routes
+# =========================
 
 class EvalRunRequest(BaseModel):
-    model_under_test: Optional[str] = "gpt-4.1-mini"
-    judge_model: Optional[str] = "gpt-4.1-mini"
-    dataset_path: Optional[str] = "eval/dataset_v1.json"
+    dataset_path: str = Field(default="dataset_v1.json")
+    rubric_path: str = Field(default="rubric_v2.json")
+    output_path: str = Field(default="output_report_v0_92.json")
+    # if true -> return full report including per-case results (large)
+    include_results: bool = Field(default=False)
+
+
+class EvalDecisionSummary(BaseModel):
+    decision: str
+    risk_level: str
+    blocking_reasons: List[str]
+    blocking_cases: List[str]
+    notes: str
 
 
 class EvalRunResponse(BaseModel):
+    run_id: str
+    mentorflow_version: str
     model_under_test: str
     judge_model: str
-    total_questions: int
-    correct: int
-    accuracy: float
+    started_at: str
     elapsed_seconds: float
+    average_score: float
+    num_cases: int
+    decision_summary: EvalDecisionSummary
+    report_path: str
+    # optional: full report JSON (can be big)
+    report: Optional[Dict[str, Any]] = None
 
 
-@app.post("/eval/run")
-def eval_run_endpoint():
+@app.post("/eval/run", response_model=EvalRunResponse)
+def eval_run_endpoint(req: EvalRunRequest):
     """
-    v0.91 – Rubric-based Evaluation (Internal Builder Tool)
+    Runs evaluator_v3 (Decision-based evaluation).
+    Advisory output only (not a hard CI gate).
     """
-    rep = run_eval(
-        model_under_test="gpt-4.1-mini",
-        judge_model="gpt-4.1-mini",
-        dataset_path="eval/dataset_v1.json",
-        rubric_path="eval/rubric_v1.json",
-        output_path="eval/output_report.json",
-        mentorflow_version="v0.9.1",
+    # Use evaluator_v3 runner
+    report = run_eval(
+        dataset_path=req.dataset_path,
+        rubric_path=req.rubric_path,
+        output_path=req.output_path,
     )
 
-    # 只回 summary，避免 payload 太大
-    return {
-        "run_id": rep["run_id"],
-        "mentorflow_version": rep["mentorflow_version"],
-        "model_under_test": rep["model_under_test"],
-        "judge_model": rep["judge_model"],
-        "total_questions": rep["total_questions"],
-        "average_score": rep["average_score"],
-        "elapsed_seconds": rep["elapsed_seconds"],
-    }
+    resp = EvalRunResponse(
+        run_id=report["run_id"],
+        mentorflow_version=report["mentorflow_version"],
+        model_under_test=report["model_under_test"],
+        judge_model=report["judge_model"],
+        started_at=report["started_at"],
+        elapsed_seconds=float(report["elapsed_seconds"]),
+        average_score=float(report["average_score"]),
+        num_cases=int(report["num_cases"]),
+        decision_summary=EvalDecisionSummary(**report["decision_summary"]),
+        report_path=req.output_path,
+        report=(report if req.include_results else None),
+    )
+    return resp
 
+
+@app.get("/eval/report")
+def eval_get_report(path: str = "output_report_v0_92.json"):
+    """
+    Convenience endpoint to fetch a saved eval report JSON file.
+    """
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return Response(content=f.read(), media_type="application/json")
+    except Exception as e:
+        return {"ok": False, "error": str(e), "path": path}
