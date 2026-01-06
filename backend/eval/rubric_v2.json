@@ -1,0 +1,36 @@
+{
+  "dimensions": {
+    "correctness": {
+      "description": "Does the answer correctly capture the core factual ideas and avoid incorrect claims?",
+      "scale": [0, 1],
+      "product_promise": "MentorFlow Instructor must provide factually correct guidance aligned with the lesson/reference content."
+    },
+    "coverage": {
+      "description": "Does the answer cover the key points expected in the ideal answer, not just one fragment?",
+      "scale": [0, 1],
+      "product_promise": "MentorFlow Instructor must cover required key points to fulfill the learning objective for the prompt."
+    },
+    "reasoning": {
+      "description": "Is the explanation logically sound, coherent, and does it justify conclusions appropriately?",
+      "scale": [0, 1],
+      "product_promise": "MentorFlow Instructor must explain in a way that helps the learner understand why, not only what."
+    },
+    "clarity": {
+      "description": "Is the answer clear, structured, and easy to follow for a learner?",
+      "scale": [0, 1],
+      "product_promise": "MentorFlow Instructor must be clear and structured so learners can confidently apply the concept."
+    },
+    "safety": {
+      "description": "Does the answer avoid misinformation, harmful guidance, unsafe instructions, or misleading claims?",
+      "scale": [0, 1],
+      "product_promise": "MentorFlow Instructor must be safe and trustworthy: no harmful or misleading guidance."
+    }
+  },
+  "weights": {
+    "correctness": 0.35,
+    "coverage": 0.25,
+    "reasoning": 0.2,
+    "clarity": 0.15,
+    "safety": 0.05
+  }
+}

@@ -1,0 +1,490 @@
+{
+  "run_id": "mf_eval_1766489413",
+  "mentorflow_version": "v0.92",
+  "model_under_test": "gpt-4.1-mini",
+  "judge_model": "gpt-4.1-mini",
+  "started_at": "2025-12-23T11:30:13.339009+00:00",
+  "elapsed_seconds": 106.045,
+  "average_score": 0.9833,
+  "num_cases": 15,
+  "decision_summary": {
+    "decision": "FIX-REQUIRED",
+    "risk_level": "MEDIUM",
+    "blocking_reasons": [
+      "coverage_gap"
+    ],
+    "blocking_cases": [
+      "c1_q04_long_context_tradeoff"
+    ],
+    "notes": "Advisory decision (not a hard CI gate)."
+  },
+  "results": [
+    {
+      "case_id": "c1_q01_tokens_basic",
+      "chapter": "chapter1",
+      "tags": [
+        "tokens",
+        "basics"
+      ],
+      "prompt": "In your own words, what is a token in the context of large language models?",
+      "ideal_answer": "A token is a basic unit of text that the model reads and generates, such as a subword, word piece or symbol. Models process input and output as sequences of tokens, not raw characters or full sentences.",
+      "model_answer": "A token is a small piece of text that a large language model processes at one time. It can be a word, part of a word, or even a single character, depending on how the model breaks down language. Tokens are the basic units the model uses to understand and generate text.",
+      "rubric_scores": {
+        "correctness": 1,
+        "coverage": 1,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "rubric_notes": {
+        "correctness": "The answer correctly defines a token as a basic unit of text processed by the model, including words, parts of words, or characters, aligning with the ideal answer.",
+        "coverage": "The answer covers all key points: tokens as small text units, including subwords or characters, and their role in model processing.",
+        "reasoning": "The explanation logically clarifies why tokens vary in size and their function as the basic units for understanding and generating text.",
+        "clarity": "The answer is clearly structured and easy to follow, making the concept accessible to learners.",
+        "safety": "The answer contains no misinformation or harmful content."
+      },
+      "weighted_score": 1.0,
+      "case_decision": {
+        "decision": "GO",
+        "risk_level": "LOW",
+        "blocking_reasons": []
+      }
+    },
+    {
+      "case_id": "c1_q02_tokens_vs_words",
+      "chapter": "chapter1",
+      "tags": [
+        "tokens",
+        "granularity"
+      ],
+      "prompt": "Why do AI PMs need to think in tokens rather than words when estimating cost and limits?",
+      "ideal_answer": "Because pricing, context window limits and latency are all defined in tokens, not words. A single word can be split into multiple tokens, so thinking in tokens gives more accurate estimates of cost and how much content fits into the model context.",
+      "model_answer": "AI PMs need to think in tokens rather than words because AI models process and charge based on tokens, not words. Tokens are smaller units—often parts of words—that better reflect how language models encode and understand text. Since token counts determine usage costs and input/output limits, estimating in tokens ensures accurate budgeting and system design. Words can vary in length and tokenization, so relying on tokens provides precise control over cost and performance constraints.",
+      "rubric_scores": {
+        "correctness": 1,
+        "coverage": 1,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "rubric_notes": {
+        "correctness": "The answer correctly states that AI models process and charge based on tokens, not words, and explains tokenization accurately.",
+        "coverage": "The answer covers pricing, context window limits, and the fact that words can be split into multiple tokens, matching the ideal answer's key points.",
+        "reasoning": "The explanation logically connects tokenization to cost estimation and system design, justifying why tokens are a better unit than words.",
+        "clarity": "The answer is well-structured and clear, making it easy for learners to understand the concept and its implications.",
+        "safety": "The answer contains no misinformation or harmful guidance and is safe and trustworthy."
+      },
+      "weighted_score": 1.0,
+      "case_decision": {
+        "decision": "GO",
+        "risk_level": "LOW",
+        "blocking_reasons": []
+      }
+    },
+    {
+      "case_id": "c1_q03_context_window",
+      "chapter": "chapter1",
+      "tags": [
+        "context_window",
+        "limits"
+      ],
+      "prompt": "What is a context window and why does it matter for building AI products?",
+      "ideal_answer": "The context window is the maximum number of tokens the model can consider at once, including both input and output. It matters because it limits how much history, documents or instructions you can send, and affects whether the model can see all relevant information at the same time.",
+      "model_answer": "A **context window** is the amount of text or data an AI model can consider at one time when generating a response. For example, if a model has a context window of 4,000 tokens, it can \"see\" and use up to 4,000 tokens of input text to understand and generate relevant output.\n\n**Why it matters for building AI products:**\n\n- **Relevance:** Larger context windows let the AI understand longer conversations, documents, or code, leading to more coherent and context-aware responses.\n- **Functionality:** Products like chatbots, summarizers, or code assistants benefit from bigger windows because they can handle more information without losing track.\n- **User experience:** Users get more accurate, detailed, and contextually appropriate outputs.\n- **Limitations:** Smaller context windows may cause the AI to \"forget\" earlier parts of the input, leading to less accurate or inconsistent results.\n\nIn short, the context window size directly affects how much information the AI can use at once, impacting the quality and capabilities of AI-powered products.",
+      "rubric_scores": {
+        "correctness": 1,
+        "coverage": 1,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "rubric_notes": {
+        "correctness": "The answer correctly defines the context window and its impact on AI model performance without any factual errors.",
+        "coverage": "The answer covers the key points about what a context window is and why it matters, including limitations and effects on AI products.",
+        "reasoning": "The explanation logically connects the size of the context window to relevance, functionality, and user experience, justifying why it matters.",
+        "clarity": "The answer is well-structured with clear headings and bullet points, making it easy to follow and understand.",
+        "safety": "The answer contains no misleading or harmful information and is safe for learners."
+      },
+      "weighted_score": 1.0,
+      "case_decision": {
+        "decision": "GO",
+        "risk_level": "LOW",
+        "blocking_reasons": []
+      }
+    },
+    {
+      "case_id": "c1_q04_long_context_tradeoff",
+      "chapter": "chapter1",
+      "tags": [
+        "context_window",
+        "tradeoffs"
+      ],
+      "prompt": "Name one trade-off when using a very long context window model compared to a shorter one.",
+      "ideal_answer": "Long context models are usually more expensive and sometimes slower than shorter context models. They allow more information per request but increase cost and may not always improve quality if the prompt is poorly structured.",
+      "model_answer": "One trade-off is that very long context window models typically require more computational resources and memory, which can lead to slower processing and higher costs compared to shorter context window models.",
+      "rubric_scores": {
+        "correctness": 1,
+        "coverage": 0,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "rubric_notes": {
+        "correctness": "The answer correctly states that long context window models require more computational resources and memory, leading to slower processing and higher costs.",
+        "coverage": "The answer misses the point about potential quality issues if the prompt is poorly structured and does not mention the benefit of allowing more information per request.",
+        "reasoning": "The explanation logically connects increased resource needs to slower processing and higher costs, helping the learner understand the trade-off.",
+        "clarity": "The answer is clear, concise, and easy to follow.",
+        "safety": "The answer contains no misinformation or harmful guidance."
+      },
+      "weighted_score": 0.75,
+      "case_decision": {
+        "decision": "FIX-REQUIRED",
+        "risk_level": "MEDIUM",
+        "blocking_reasons": [
+          "coverage_gap"
+        ]
+      }
+    },
+    {
+      "case_id": "c1_q05_embeddings_definition",
+      "chapter": "chapter1",
+      "tags": [
+        "embeddings",
+        "definition"
+      ],
+      "prompt": "Explain what an embedding is in the context of text and language models.",
+      "ideal_answer": "An embedding is a numerical vector representation of text in a continuous space where similar meanings are close together. Each text piece is mapped to a vector so that semantic similarity becomes geometric closeness in that space.",
+      "model_answer": "In the context of text and language models, an **embedding** is a way to represent words, phrases, or sentences as dense vectors of numbers. These vectors capture the semantic meaning and relationships between pieces of text in a continuous, high-dimensional space. \n\nFor example, similar words like \"king\" and \"queen\" will have embeddings that are close to each other, while unrelated words like \"king\" and \"apple\" will be farther apart. Embeddings allow language models to process and understand text mathematically, enabling tasks like similarity comparison, classification, and generation.",
+      "rubric_scores": {
+        "correctness": 1,
+        "coverage": 1,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "rubric_notes": {
+        "correctness": "The answer accurately describes embeddings as dense numerical vectors capturing semantic meaning and relationships.",
+        "coverage": "The answer covers key points including representation of words/phrases/sentences, semantic closeness, and example of similar/dissimilar words.",
+        "reasoning": "The explanation logically connects embeddings to semantic similarity and their use in language models for various tasks.",
+        "clarity": "The answer is well-structured, clear, and easy to follow with examples that aid understanding.",
+        "safety": "The answer contains no misinformation or harmful guidance."
+      },
+      "weighted_score": 1.0,
+      "case_decision": {
+        "decision": "GO",
+        "risk_level": "LOW",
+        "blocking_reasons": []
+      }
+    },
+    {
+      "case_id": "c1_q06_embeddings_usecases",
+      "chapter": "chapter1",
+      "tags": [
+        "embeddings",
+        "use_cases"
+      ],
+      "prompt": "Give two common product use cases where embeddings are useful for AI PMs.",
+      "ideal_answer": "Typical use cases include semantic search, where you find similar documents or queries using vector similarity, and clustering or recommendations, where you group or suggest items based on embedding similarity. Other examples are deduplication and topic discovery.",
+      "model_answer": "Certainly! Two common product use cases where embeddings are useful for AI Product Managers are:\n\n1. **Semantic Search:** Embeddings enable search systems to understand the meaning behind queries and documents, allowing users to find relevant results even if exact keywords don’t match. This improves search accuracy and user experience.\n\n2. **Recommendation Systems:** Embeddings represent users and items in a shared vector space, capturing similarities and preferences. This helps generate personalized recommendations by identifying items similar to those a user likes.\n\nThese use cases leverage embeddings to capture nuanced relationships in data beyond simple keyword matching.",
+      "rubric_scores": {
+        "correctness": 1,
+        "coverage": 1,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "rubric_notes": {
+        "correctness": "The answer correctly describes semantic search and recommendation systems as common embedding use cases without any factual errors.",
+        "coverage": "The answer covers the two key use cases mentioned in the ideal answer: semantic search and recommendations.",
+        "reasoning": "The explanation logically connects how embeddings enable semantic understanding and personalized recommendations, clarifying why these use cases benefit from embeddings.",
+        "clarity": "The answer is well-structured with numbered points and clear language, making it easy to follow.",
+        "safety": "The answer contains no misinformation or harmful guidance."
+      },
+      "weighted_score": 1.0,
+      "case_decision": {
+        "decision": "GO",
+        "risk_level": "LOW",
+        "blocking_reasons": []
+      }
+    },
+    {
+      "case_id": "c3_q01_rag_definition",
+      "chapter": "chapter3",
+      "tags": [
+        "rag",
+        "definition"
+      ],
+      "prompt": "Briefly define Retrieval-Augmented Generation (RAG).",
+      "ideal_answer": "RAG is a pattern where the system retrieves relevant context from an external knowledge source and feeds it into the model as part of the prompt, so that the answer is grounded in that retrieved context instead of relying only on the model’s internal parameters.",
+      "model_answer": "Retrieval-Augmented Generation (RAG) is a technique that combines information retrieval with generative models. It first retrieves relevant documents or data from an external knowledge source and then uses this retrieved context to generate more accurate and informed responses. This approach helps improve the quality and factual accuracy of generated text.",
+      "rubric_scores": {
+        "correctness": 1,
+        "coverage": 1,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "rubric_notes": {
+        "correctness": "The answer correctly explains RAG as combining retrieval with generative models to ground answers in external context.",
+        "coverage": "The answer covers key points: retrieval from external sources, use of retrieved context in generation, and grounding answers beyond internal parameters.",
+        "reasoning": "The explanation logically connects retrieval to improved accuracy and informed responses, justifying the approach.",
+        "clarity": "The answer is clear, well-structured, and easy to understand for learners.",
+        "safety": "No misinformation or harmful guidance is present; the answer is safe and trustworthy."
+      },
+      "weighted_score": 1.0,
+      "case_decision": {
+        "decision": "GO",
+        "risk_level": "LOW",
+        "blocking_reasons": []
+      }
+    },
+    {
+      "case_id": "c3_q02_rag_why_useful",
+      "chapter": "chapter3",
+      "tags": [
+        "rag",
+        "benefits"
+      ],
+      "prompt": "Why is RAG often preferred over fine-tuning for knowledge-heavy use cases?",
+      "ideal_answer": "Because RAG lets you keep knowledge in an external store that can be updated without retraining the model. It reduces hallucinations, keeps answers up-to-date, and is usually cheaper and faster to iterate compared to frequent fine-tuning.",
+      "model_answer": "RAG (Retrieval-Augmented Generation) is often preferred over fine-tuning for knowledge-heavy use cases because:\n\n1. **Up-to-date knowledge:** RAG retrieves relevant documents from an external knowledge base at inference time, allowing it to use the latest information without retraining the model.\n\n2. **Scalability:** Instead of embedding all knowledge into model weights (which requires expensive and time-consuming fine-tuning), RAG accesses a large corpus dynamically, making it easier to scale and update.\n\n3. **Efficiency:** Fine-tuning large models on vast knowledge bases is resource-intensive. RAG leverages retrieval to focus generation on relevant context, reducing the need for extensive retraining.\n\n4. **Flexibility:** RAG can adapt to multiple domains by swapping or updating the retrieval database, whereas fine-tuning requires separate training for each domain.\n\nIn short, RAG combines retrieval with generation to handle large, evolving knowledge efficiently without costly fine-tuning.",
+      "rubric_scores": {
+        "correctness": 1,
+        "coverage": 1,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "rubric_notes": {
+        "correctness": "The answer accurately explains why RAG is preferred over fine-tuning, aligning well with the ideal answer without introducing errors.",
+        "coverage": "The model covers all key points: up-to-date knowledge, scalability, efficiency, and flexibility, matching the ideal answer's scope.",
+        "reasoning": "The explanation logically connects the benefits of RAG to the challenges of fine-tuning, providing clear justification.",
+        "clarity": "The answer is well-structured with numbered points and clear language, making it easy to follow.",
+        "safety": "The answer contains no misleading or harmful information and is safe for learners."
+      },
+      "weighted_score": 1.0,
+      "case_decision": {
+        "decision": "GO",
+        "risk_level": "LOW",
+        "blocking_reasons": []
+      }
+    },
+    {
+      "case_id": "c3_q03_chunking_reason",
+      "chapter": "chapter3",
+      "tags": [
+        "chunking",
+        "documents"
+      ],
+      "prompt": "Why do we need to chunk long documents before building a RAG system?",
+      "ideal_answer": "Because long documents exceed a single embedding or context window and can dilute relevance. Chunking splits them into smaller, coherent pieces so that each chunk can be embedded, retrieved and injected precisely, improving relevance and reducing noise.",
+      "model_answer": "We chunk long documents before building a Retrieval-Augmented Generation (RAG) system because:\n\n1. **Model Input Limits:** Language models and retrievers have maximum token limits. Chunking ensures each piece fits within these limits.\n\n2. **Efficient Retrieval:** Smaller, focused chunks improve the relevance and precision of retrieval, as the system can match queries to specific, manageable text segments.\n\n3. **Better Context Handling:** Chunking helps the model attend to relevant context without being overwhelmed by irrelevant or excessive information.\n\n4. **Improved Generation Quality:** By retrieving concise, relevant chunks, the generation step produces more accurate and coherent responses.\n\nIn short, chunking enables scalable, precise, and effective retrieval and generation in RAG systems.",
+      "rubric_scores": {
+        "correctness": 1,
+        "coverage": 1,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "rubric_notes": {
+        "correctness": "The answer correctly explains the need to chunk documents due to model input limits and relevance concerns, aligning with the ideal answer.",
+        "coverage": "The model covers key points including token limits, improved retrieval relevance, context handling, and generation quality, matching the ideal answer's scope.",
+        "reasoning": "The explanation logically connects chunking to handling input limits and improving retrieval and generation, providing clear justification.",
+        "clarity": "The answer is well-structured with numbered points and clear language, making it easy to follow.",
+        "safety": "The answer contains no misinformation or harmful guidance."
+      },
+      "weighted_score": 1.0,
+      "case_decision": {
+        "decision": "GO",
+        "risk_level": "LOW",
+        "blocking_reasons": []
+      }
+    },
+    {
+      "case_id": "c3_q04_chunk_size_tradeoff",
+      "chapter": "chapter3",
+      "tags": [
+        "chunking",
+        "tradeoffs"
+      ],
+      "prompt": "Describe one trade-off when choosing chunk size in a RAG system.",
+      "ideal_answer": "If chunks are too small, you lose context and retrieval becomes noisy. If chunks are too large, relevant details are harder to isolate, you waste tokens and may hit context limits. Chunk size is a trade-off between preserving enough context and keeping each chunk focused and compact.",
+      "model_answer": "One trade-off when choosing chunk size in a Retrieval-Augmented Generation (RAG) system is between **context granularity and retrieval relevance**. Smaller chunks provide finer-grained, more precise context, which can improve the relevance of retrieved information but may increase the number of retrieval operations and computational overhead. Larger chunks reduce retrieval calls and may capture more complete context but risk including irrelevant information, potentially diluting the quality of the generated response.",
+      "rubric_scores": {
+        "correctness": 1,
+        "coverage": 1,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "rubric_notes": {
+        "correctness": "The answer accurately describes the trade-off between chunk size and retrieval relevance without any factual errors.",
+        "coverage": "The model covers both sides of the trade-off: smaller chunks improve precision but increase overhead, larger chunks reduce calls but risk irrelevant info, matching the key points in the ideal answer.",
+        "reasoning": "The explanation logically connects chunk size choices to their impact on retrieval relevance and computational cost, helping the learner understand why the trade-off exists.",
+        "clarity": "The answer is well-structured, clear, and uses accessible language, making it easy for learners to follow.",
+        "safety": "The answer contains no misleading or harmful information."
+      },
+      "weighted_score": 1.0,
+      "case_decision": {
+        "decision": "GO",
+        "risk_level": "LOW",
+        "blocking_reasons": []
+      }
+    },
+    {
+      "case_id": "c3_q05_retrieval_quality",
+      "chapter": "chapter3",
+      "tags": [
+        "retrieval",
+        "quality"
+      ],
+      "prompt": "What is retrieval quality in RAG and why does it matter more than just using a stronger model?",
+      "ideal_answer": "Retrieval quality measures whether the system finds the truly relevant chunks for a query. If retrieval is poor, even the strongest model will hallucinate or answer from the wrong context. Good retrieval often improves real-world performance more than simply upgrading to a more powerful model.",
+      "model_answer": "Retrieval quality in Retrieval-Augmented Generation (RAG) refers to how relevant and accurate the documents or passages fetched from an external knowledge source are, before being passed to the generative model.\n\nIt matters more than just using a stronger model because:\n\n1. **Better Context:** High-quality retrieval provides the model with precise, relevant information, enabling it to generate accurate and fact-based responses.\n2. **Limits Hallucination:** Without good retrieval, even a powerful model may hallucinate or produce incorrect answers due to lack of proper grounding.\n3. **Efficiency:** Stronger models are computationally expensive; improving retrieval can boost performance without needing a larger model.\n4. **Domain Adaptability:** Retrieval can bring in up-to-date or domain-specific knowledge that the model alone may not have learned during training.\n\nIn short, retrieval quality directly impacts the factual correctness and relevance of the output, often more effectively than just scaling up the model size.",
+      "rubric_scores": {
+        "correctness": 1,
+        "coverage": 1,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "rubric_notes": {
+        "correctness": "The answer correctly explains retrieval quality and why it matters more than just a stronger model, aligning with the ideal answer.",
+        "coverage": "The answer covers all key points: relevance of retrieval, hallucination risk, efficiency, and domain adaptability.",
+        "reasoning": "The explanation logically connects retrieval quality to improved factual accuracy and model performance.",
+        "clarity": "The answer is well-structured with clear points and easy-to-understand language.",
+        "safety": "No misinformation or harmful guidance is present; the answer is safe and trustworthy."
+      },
+      "weighted_score": 1.0,
+      "case_decision": {
+        "decision": "GO",
+        "risk_level": "LOW",
+        "blocking_reasons": []
+      }
+    },
+    {
+      "case_id": "c5_q01_eval_why_needed",
+      "chapter": "chapter5",
+      "tags": [
+        "evaluation",
+        "motivation"
+      ],
+      "prompt": "Why is an evaluation system necessary for an AI teaching product like MentorFlow instead of relying only on manual testing?",
+      "ideal_answer": "Because manual testing does not scale and is inconsistent. An evaluation system lets you measure quality repeatedly, compare model or prompt changes over time, detect regressions and make decisions with data instead of intuition. It turns quality from a feeling into a measurable signal.",
+      "model_answer": "An evaluation system is necessary for an AI teaching product like MentorFlow because:\n\n1. **Scalability:** Manual testing is time-consuming and cannot efficiently handle the large volume of interactions and content updates typical in AI-driven education.\n\n2. **Consistency:** Automated evaluation ensures consistent measurement of performance and learning outcomes, reducing human bias and variability.\n\n3. **Continuous Improvement:** An evaluation system provides ongoing feedback on the AI’s effectiveness, enabling iterative refinement and adaptation to learners’ needs.\n\n4. **Objective Metrics:** It offers quantitative data to assess accuracy, engagement, and learning gains, which manual testing alone may not capture reliably.\n\nIn short, an evaluation system complements manual testing by providing scalable, consistent, and data-driven insights essential for maintaining and improving AI teaching quality.",
+      "rubric_scores": {
+        "correctness": 1,
+        "coverage": 1,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "rubric_notes": {
+        "correctness": "The answer correctly explains why an evaluation system is necessary, aligning well with the ideal answer without introducing errors.",
+        "coverage": "The model covers all key points: scalability, consistency, continuous improvement, and objective metrics, matching the ideal answer's scope.",
+        "reasoning": "The explanation logically connects the need for evaluation systems to benefits like scalability and data-driven decisions, justifying the conclusions well.",
+        "clarity": "The answer is well-structured with clear numbered points, making it easy to follow and understand.",
+        "safety": "The answer contains no misinformation or harmful guidance and is safe and trustworthy."
+      },
+      "weighted_score": 1.0,
+      "case_decision": {
+        "decision": "GO",
+        "risk_level": "LOW",
+        "blocking_reasons": []
+      }
+    },
+    {
+      "case_id": "c5_q02_golden_dataset_role",
+      "chapter": "chapter5",
+      "tags": [
+        "evaluation",
+        "golden_dataset"
+      ],
+      "prompt": "What is a golden dataset and how is it used in evaluation?",
+      "ideal_answer": "A golden dataset is a curated set of representative questions and trusted reference answers that encode what ‘good’ looks like. It is used to consistently test models or configurations so that you can compare performance over time and across versions in a stable, repeatable way.",
+      "model_answer": "A **golden dataset** is a carefully curated and highly accurate set of data that serves as a reliable ground truth for evaluating models or systems. It is typically created by experts through manual annotation or verification to ensure correctness.\n\n**How it is used in evaluation:**\n- Acts as a benchmark to compare model outputs against.\n- Helps measure performance metrics like accuracy, precision, recall, and F1-score.\n- Ensures consistent and objective assessment of different models or versions.\n- Identifies errors and areas for improvement by highlighting discrepancies between predictions and the golden data.\n\nIn summary, a golden dataset provides a trusted reference to validate and quantify the quality of a model’s predictions.",
+      "rubric_scores": {
+        "correctness": 1,
+        "coverage": 1,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "rubric_notes": {
+        "correctness": "The answer accurately defines a golden dataset and its use in evaluation without any factual errors.",
+        "coverage": "The model covers the key points: curated data, trusted ground truth, consistent testing, and comparison across models.",
+        "reasoning": "The explanation logically connects the purpose of the golden dataset to evaluation metrics and model improvement.",
+        "clarity": "The answer is well-structured with clear sections and bullet points, making it easy to follow.",
+        "safety": "The answer contains no misleading or harmful information."
+      },
+      "weighted_score": 1.0,
+      "case_decision": {
+        "decision": "GO",
+        "risk_level": "LOW",
+        "blocking_reasons": []
+      }
+    },
+    {
+      "case_id": "c5_q03_eval_vs_accuracy_only",
+      "chapter": "chapter5",
+      "tags": [
+        "evaluation",
+        "metrics"
+      ],
+      "prompt": "Why is looking at just a single accuracy number not enough to fully evaluate an AI teaching system?",
+      "ideal_answer": "A single accuracy number hides important details such as which topics fail, what error patterns appear and how explanations feel to learners. You also need to understand failure modes, per-topic performance, reasoning quality and safety, not just overall correctness.",
+      "model_answer": "Looking at just a single accuracy number is not enough because it oversimplifies the system’s performance. Accuracy alone doesn’t reveal how well the AI handles different types of errors, the balance between precision and recall, or how it performs across diverse student groups and learning contexts. It also ignores factors like engagement, adaptability, and the quality of feedback, which are crucial for effective teaching. A comprehensive evaluation requires multiple metrics and qualitative insights to fully understand the system’s strengths and weaknesses.",
+      "rubric_scores": {
+        "correctness": 1,
+        "coverage": 1,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "rubric_notes": {
+        "correctness": "The answer correctly explains why a single accuracy number is insufficient without introducing any incorrect claims.",
+        "coverage": "The answer covers key points such as error types, performance across groups, engagement, adaptability, and feedback quality, aligning well with the ideal answer's emphasis on multiple metrics and qualitative insights.",
+        "reasoning": "The explanation logically connects the limitations of accuracy to the need for multiple metrics and qualitative factors, justifying why a comprehensive evaluation is necessary.",
+        "clarity": "The answer is clearly structured and easy to follow, making the reasoning accessible to learners.",
+        "safety": "The answer contains no misleading or harmful information and is safe for learners."
+      },
+      "weighted_score": 1.0,
+      "case_decision": {
+        "decision": "GO",
+        "risk_level": "LOW",
+        "blocking_reasons": []
+      }
+    },
+    {
+      "case_id": "c5_q04_eval_for_regression",
+      "chapter": "chapter5",
+      "tags": [
+        "evaluation",
+        "regression"
+      ],
+      "prompt": "How does an evaluation pipeline help you detect regressions when you change prompts, models or system design?",
+      "ideal_answer": "By running the same golden dataset before and after a change and comparing results. If some questions that used to pass now fail, the pipeline highlights them, so you can see exactly where the system regressed and decide whether to roll back, tweak prompts or adjust the design.",
+      "model_answer": "An evaluation pipeline systematically tests your prompts, models, or system changes against a consistent set of metrics and test cases. This helps detect regressions by:\n\n1. **Providing a baseline:** It compares current performance to previous results, highlighting any drops in accuracy, relevance, or other key metrics.\n2. **Automating tests:** It runs evaluations automatically whenever changes are made, ensuring regressions are caught early.\n3. **Ensuring consistency:** By using the same datasets and metrics, it isolates the impact of changes rather than noise from varying test conditions.\n4. **Tracking trends:** It helps monitor performance over time, making it easier to spot gradual degradations.\n\nIn short, an evaluation pipeline acts as a reliable checkpoint to verify that updates improve or at least maintain system quality without unintended negative effects.",
+      "rubric_scores": {
+        "correctness": 1,
+        "coverage": 1,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "rubric_notes": {
+        "correctness": "The answer correctly explains how an evaluation pipeline detects regressions by comparing performance before and after changes using consistent datasets and metrics.",
+        "coverage": "The model covers key points including baseline comparison, automation, consistency, and trend tracking, aligning well with the ideal answer's focus on detecting regressions via comparison on a golden dataset.",
+        "reasoning": "The explanation logically justifies how the pipeline helps detect regressions and why consistent testing is important, aiding learner understanding.",
+        "clarity": "The answer is well-structured with clear points and a concise summary, making it easy to follow.",
+        "safety": "The answer contains no harmful or misleading information and provides safe, trustworthy guidance."
+      },
+      "weighted_score": 1.0,
+      "case_decision": {
+        "decision": "GO",
+        "risk_level": "LOW",
+        "blocking_reasons": []
+      }
+    }
+  ]
+}
