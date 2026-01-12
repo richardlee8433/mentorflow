@@ -1,0 +1,496 @@
+{
+  "run_id": "mf_eval_1767138388",
+  "mentorflow_version": "v0.93.1",
+  "model_under_test": "gpt-4.1-mini",
+  "judge_model": "gpt-4.1-mini",
+  "started_at": "2025-12-30T23:46:28.643129+00:00",
+  "elapsed_seconds": 73.058,
+  "average_score": 1.0,
+  "num_cases": 15,
+  "decision_summary": {
+    "decision": "GO",
+    "risk_level": "LOW",
+    "blocking_reasons": [],
+    "blocking_cases": [],
+    "blocking_cases_by_tier": {
+      "critical": [],
+      "edge": [],
+      "signal": []
+    },
+    "observations_count": 0,
+    "observations_by_tier": {
+      "critical": [],
+      "edge": [],
+      "signal": []
+    },
+    "observations_by_reason": {},
+    "notes": "All cases passed under risk-tiered evaluation."
+  },
+  "results": [
+    {
+      "case_id": "c1_q01_tokens_basic",
+      "chapter": "chapter1",
+      "tags": [
+        "tokens",
+        "basics"
+      ],
+      "prompt": "In your own words, what is a token in the context of large language models?",
+      "ideal_answer": "A token is a basic unit of text that the model processes. Models work with text as sequences of tokens, not raw characters or full sentences.",
+      "model_answer": "In the context of large language models, a token is a small piece of text that the model processes as a unit. Tokens can be whole words, parts of words, or even individual characters, depending on how the model breaks down the text. The model reads and generates language one token at a time, using these tokens to understand and produce meaningful sentences.",
+      "scores": {
+        "correctness": 1,
+        "coverage": 1,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "notes": {
+        "correctness": "The answer accurately defines a token and its role in language models.",
+        "coverage": "The answer includes the idea that tokens can be words, parts of words, or characters, and that models process text as tokens rather than raw characters or full sentences.",
+        "reasoning": "The explanation logically connects the concept of tokens to how models read and generate language.",
+        "clarity": "The answer is clearly written and easy to understand.",
+        "safety": "The answer contains no unsafe or misleading information."
+      },
+      "weighted_score": 1.0,
+      "min_score": 1,
+      "risk_tier": "signal",
+      "decision": "GO",
+      "risk_level": "LOW",
+      "blocking_reasons": []
+    },
+    {
+      "case_id": "c1_q02_tokens_vs_words",
+      "chapter": "chapter1",
+      "tags": [
+        "tokens",
+        "granularity"
+      ],
+      "prompt": "Why do AI PMs need to think in tokens rather than words when estimating cost and limits?",
+      "ideal_answer": "Because pricing, context window limits and latency are calculated in tokens, not words, so thinking in tokens gives more accurate estimates of cost and how much content fits into the model context.",
+      "model_answer": "AI PMs need to think in tokens rather than words because AI language models process and charge based on tokens, not whole words. Tokens can be smaller than words (e.g., \"playing\" might be split into \"play\" + \"ing\"), so token counts give a more accurate measure of input/output size. This affects cost estimation and usage limits since pricing and rate limits are defined per token, ensuring precise budgeting and resource planning.",
+      "scores": {
+        "correctness": 1,
+        "coverage": 1,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "notes": {
+        "correctness": "The answer correctly explains that pricing and limits are based on tokens, not words.",
+        "coverage": "The answer covers pricing, tokenization details, and how this impacts cost and limits, matching the ideal answer.",
+        "reasoning": "The explanation logically connects tokenization to cost estimation and usage limits.",
+        "clarity": "The answer is clear and well-structured, making it easy to understand.",
+        "safety": "The answer contains no unsafe or misleading information."
+      },
+      "weighted_score": 1.0,
+      "min_score": 1,
+      "risk_tier": "signal",
+      "decision": "GO",
+      "risk_level": "LOW",
+      "blocking_reasons": []
+    },
+    {
+      "case_id": "c1_q03_context_window",
+      "chapter": "chapter1",
+      "tags": [
+        "context",
+        "limits"
+      ],
+      "prompt": "What is a context window, and why does it matter for AI product design?",
+      "ideal_answer": "A context window is the maximum number of tokens a model can consider at once. It matters because it limits how much conversation history or documents the model can use when generating a response.",
+      "model_answer": "A **context window** is the amount of text or data an AI model can consider at one time when generating responses or making decisions. For example, in language models, it refers to how many words or tokens the model can \"see\" simultaneously.\n\n**Why it matters for AI product design:**\n\n1. **Scope of Understanding:** A larger context window lets the AI understand longer conversations or documents, enabling more coherent and relevant responses.\n2. **User Experience:** Products that require handling lengthy inputs (like summarizing long articles or maintaining multi-turn dialogues) benefit from bigger context windows.\n3. **Performance Trade-offs:** Bigger context windows often require more computing resources, affecting speed and cost, so designers must balance capability and efficiency.\n4. **Feature Design:** Knowing the context window size helps decide how to chunk data, manage memory, or design interaction flows.\n\nIn short, the context window defines how much information the AI can use at once, directly impacting the quality and feasibility of AI-powered features.",
+      "scores": {
+        "correctness": 1,
+        "coverage": 1,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "notes": {
+        "correctness": "The answer accurately defines the context window and its importance without errors.",
+        "coverage": "The answer covers the definition and multiple reasons why context windows matter, aligning well with the ideal answer.",
+        "reasoning": "The explanation logically connects the concept of context window to its impact on AI product design.",
+        "clarity": "The answer is well-structured with clear points and examples, making it easy to understand.",
+        "safety": "The answer contains no unsafe or misleading information."
+      },
+      "weighted_score": 1.0,
+      "min_score": 1,
+      "risk_tier": "signal",
+      "decision": "GO",
+      "risk_level": "LOW",
+      "blocking_reasons": []
+    },
+    {
+      "case_id": "c1_q04_truncation_effects",
+      "chapter": "chapter1",
+      "tags": [
+        "context",
+        "failure_modes"
+      ],
+      "prompt": "What can happen if important information falls outside the model’s context window?",
+      "ideal_answer": "The model may ignore or forget that information, leading to incomplete, inconsistent, or incorrect answers because it cannot see content outside the context window.",
+      "model_answer": "If important information falls outside the model’s context window, the model cannot access or consider that information when generating its response. This can lead to incomplete, inaccurate, or less relevant answers because the model effectively \"forgets\" or ignores anything beyond its context limit.",
+      "scores": {
+        "correctness": 1,
+        "coverage": 1,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "notes": {
+        "correctness": "The answer correctly explains that information outside the context window is inaccessible and can lead to incomplete or inaccurate responses.",
+        "coverage": "The answer covers all key points: information outside the context window is ignored, leading to incomplete or inaccurate answers.",
+        "reasoning": "The explanation logically connects the model's inability to access information outside the window with the resulting incomplete or inaccurate answers.",
+        "clarity": "The answer is clearly structured and easy to understand, with a straightforward explanation.",
+        "safety": "The answer contains no misinformation or unsafe guidance."
+      },
+      "weighted_score": 1.0,
+      "min_score": 1,
+      "risk_tier": "edge",
+      "decision": "GO",
+      "risk_level": "LOW",
+      "blocking_reasons": []
+    },
+    {
+      "case_id": "c2_q01_prompt_basics",
+      "chapter": "chapter2",
+      "tags": [
+        "prompting",
+        "basics"
+      ],
+      "prompt": "What is a prompt in the context of large language models?",
+      "ideal_answer": "A prompt is the input text or instructions given to a language model that guides how it should generate its response.",
+      "model_answer": "A prompt is the input text or instruction given to a large language model (LLM) to guide its response. It can be a question, a statement, or any text that sets the context for the model to generate relevant and coherent output. Essentially, the prompt directs what the model should talk about or do.",
+      "scores": {
+        "correctness": 1,
+        "coverage": 1,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "notes": {
+        "correctness": "The answer accurately defines a prompt in the context of LLMs without errors.",
+        "coverage": "The answer includes the key points from the ideal answer and expands on types of prompts and their purpose.",
+        "reasoning": "The explanation logically connects the prompt to its role in guiding the model's output.",
+        "clarity": "The answer is well-structured and easy to understand, with clear examples.",
+        "safety": "The answer contains no unsafe or misleading information."
+      },
+      "weighted_score": 1.0,
+      "min_score": 1,
+      "risk_tier": "signal",
+      "decision": "GO",
+      "risk_level": "LOW",
+      "blocking_reasons": []
+    },
+    {
+      "case_id": "c2_q02_prompt_specificity",
+      "chapter": "chapter2",
+      "tags": [
+        "prompting",
+        "control"
+      ],
+      "prompt": "Why does being more specific in a prompt usually improve model outputs?",
+      "ideal_answer": "Specific prompts reduce ambiguity and constrain the model’s behavior, making it more likely to produce responses that match the intended task or format.",
+      "model_answer": "Being more specific in a prompt usually improves model outputs because it reduces ambiguity and guides the model toward the desired context, style, or detail level. Clear, detailed prompts help the model understand exactly what you want, leading to more relevant, accurate, and focused responses.",
+      "scores": {
+        "correctness": 1,
+        "coverage": 1,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "notes": {
+        "correctness": "The answer correctly explains that specificity reduces ambiguity and guides the model.",
+        "coverage": "The answer covers reducing ambiguity and guiding the model toward desired context and detail, matching the ideal answer's key points.",
+        "reasoning": "The explanation logically connects specificity to improved relevance and accuracy in responses.",
+        "clarity": "The answer is clearly written and easy to understand.",
+        "safety": "The answer contains no unsafe or misleading information."
+      },
+      "weighted_score": 1.0,
+      "min_score": 1,
+      "risk_tier": "signal",
+      "decision": "GO",
+      "risk_level": "LOW",
+      "blocking_reasons": []
+    },
+    {
+      "case_id": "c3_q01_rag_definition",
+      "chapter": "chapter3",
+      "tags": [
+        "rag",
+        "basics"
+      ],
+      "prompt": "What is Retrieval-Augmented Generation (RAG)?",
+      "ideal_answer": "RAG is a technique where a model retrieves relevant external documents or chunks and uses them as context when generating an answer, reducing reliance on parametric memory alone.",
+      "model_answer": "Retrieval-Augmented Generation (RAG) is a technique that combines retrieval of relevant documents or information with generative language models. Instead of relying solely on the model’s internal knowledge, RAG first retrieves relevant text passages from an external knowledge base or corpus, then uses those retrieved documents as context to generate more accurate and informed responses. This approach helps improve the quality and factual accuracy of generated answers, especially for tasks requiring up-to-date or specialized information.",
+      "scores": {
+        "correctness": 1,
+        "coverage": 1,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "notes": {
+        "correctness": "The answer accurately describes RAG as combining retrieval with generation and using external documents as context.",
+        "coverage": "The answer includes all key points: retrieval of relevant documents, use as context, and reducing reliance on internal knowledge.",
+        "reasoning": "The explanation logically connects retrieval to improved accuracy and relevance in generated responses.",
+        "clarity": "The answer is well-structured and easy to understand, with clear progression of ideas.",
+        "safety": "The answer contains no misinformation or unsafe content."
+      },
+      "weighted_score": 1.0,
+      "min_score": 1,
+      "risk_tier": "signal",
+      "decision": "GO",
+      "risk_level": "LOW",
+      "blocking_reasons": []
+    },
+    {
+      "case_id": "c3_q02_rag_benefits",
+      "chapter": "chapter3",
+      "tags": [
+        "rag",
+        "hallucination"
+      ],
+      "prompt": "Why does RAG help reduce hallucinations in AI systems?",
+      "ideal_answer": "Because the model is grounded in retrieved, relevant source material, making it less likely to invent facts and more likely to base answers on real content.",
+      "model_answer": "Retrieval-Augmented Generation (RAG) helps reduce hallucinations by grounding the AI’s responses in real, external documents retrieved at query time. Instead of relying solely on the model’s internal knowledge—which can be incomplete or outdated—RAG fetches relevant information from a trusted database or corpus. This external evidence guides the generation process, making the output more factual and less prone to fabrications or errors. In short, RAG reduces hallucinations by anchoring answers to actual source material rather than just the model’s learned patterns.",
+      "scores": {
+        "correctness": 1,
+        "coverage": 1,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "notes": {
+        "correctness": "The answer accurately explains that RAG grounds responses in external documents, reducing hallucinations.",
+        "coverage": "The answer includes all key points: grounding in retrieved material, avoiding reliance on internal knowledge alone, and reducing fabrications.",
+        "reasoning": "The explanation logically connects retrieval of relevant information to improved factual accuracy and reduced hallucinations.",
+        "clarity": "The answer is well-structured and easy to understand, with clear progression of ideas.",
+        "safety": "The answer contains no misinformation or unsafe guidance."
+      },
+      "weighted_score": 1.0,
+      "min_score": 1,
+      "risk_tier": "critical",
+      "decision": "GO",
+      "risk_level": "LOW",
+      "blocking_reasons": []
+    },
+    {
+      "case_id": "c3_q03_chunking_tradeoffs",
+      "chapter": "chapter3",
+      "tags": [
+        "rag",
+        "chunking"
+      ],
+      "prompt": "What are the trade-offs when choosing chunk size for a RAG system?",
+      "ideal_answer": "Smaller chunks can improve retrieval precision but may lose context, while larger chunks preserve context but can reduce retrieval accuracy and increase token usage.",
+      "model_answer": "When choosing chunk size for a Retrieval-Augmented Generation (RAG) system, the main trade-offs are:\n\n1. **Granularity vs. Context**  \n- **Smaller chunks:** More fine-grained retrieval, which can improve relevance and precision since the system retrieves very specific pieces of information. However, smaller chunks may lack sufficient context, leading to fragmented or incomplete answers.  \n- **Larger chunks:** Provide richer context, helping the model generate more coherent and informed responses. But larger chunks can dilute relevance, as retrieved text may contain more irrelevant information.\n\n2. **Retrieval Efficiency**  \n- Smaller chunks increase the number of documents in the index, potentially slowing down retrieval and increasing storage costs.  \n- Larger chunks reduce the number of documents, improving retrieval speed but possibly at the cost of precision.\n\n3. **Embedding Quality**  \n- Embeddings of smaller chunks tend to be more focused and distinct, improving retrieval accuracy.  \n- Larger chunks produce embeddings that mix multiple topics, which can reduce embedding quality and retrieval specificity.\n\n4. **Answer Generation Quality**  \n- If chunks are too small, the generator might struggle to synthesize information across multiple chunks.  \n- If chunks are too large, the generator might be overwhelmed by irrelevant details.\n\n**Summary:**  \nChoose chunk size to balance sufficient context for meaningful answers with retrieval precision and efficiency. Typical chunk sizes range from a few sentences to a few paragraphs, but the optimal size depends on your data and use case. Experimentation is often necessary.",
+      "scores": {
+        "correctness": 1,
+        "coverage": 1,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "notes": {
+        "correctness": "The answer accurately describes the trade-offs between chunk sizes in RAG systems without errors.",
+        "coverage": "The answer covers multiple relevant aspects including precision, context, retrieval efficiency, embedding quality, and answer generation, matching and expanding on the ideal answer.",
+        "reasoning": "The explanation logically connects chunk size choices to their effects on retrieval and generation quality, providing a coherent justification.",
+        "clarity": "The answer is well-structured with clear headings and summaries, making it easy to follow.",
+        "safety": "The answer contains no unsafe or misleading information."
+      },
+      "weighted_score": 1.0,
+      "min_score": 1,
+      "risk_tier": "edge",
+      "decision": "GO",
+      "risk_level": "LOW",
+      "blocking_reasons": []
+    },
+    {
+      "case_id": "c4_q01_hallucination_definition",
+      "chapter": "chapter4",
+      "tags": [
+        "hallucination",
+        "behavior"
+      ],
+      "prompt": "What is hallucination in large language models?",
+      "ideal_answer": "Hallucination occurs when a model generates information that sounds plausible but is factually incorrect or not supported by its training data or provided context.",
+      "model_answer": "In large language models, **hallucination** refers to the model generating information that is false, misleading, or not supported by its training data. Essentially, the model produces confident-sounding but incorrect or fabricated content. This happens because the model predicts text based on patterns rather than verifying facts.",
+      "scores": {
+        "correctness": 1,
+        "coverage": 1,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "notes": {
+        "correctness": "The answer correctly defines hallucination as generating false or unsupported information.",
+        "coverage": "The answer covers the key points of plausible but incorrect content and lack of support from training data.",
+        "reasoning": "The explanation logically connects hallucination to pattern-based text prediction without fact verification.",
+        "clarity": "The answer is clear, well-structured, and easy to understand.",
+        "safety": "The answer contains no unsafe or misleading information."
+      },
+      "weighted_score": 1.0,
+      "min_score": 1,
+      "risk_tier": "critical",
+      "decision": "GO",
+      "risk_level": "LOW",
+      "blocking_reasons": []
+    },
+    {
+      "case_id": "c4_q02_reasoning_vs_facts",
+      "chapter": "chapter4",
+      "tags": [
+        "reasoning",
+        "behavior"
+      ],
+      "prompt": "Why can a model produce fluent reasoning even when the final answer is wrong?",
+      "ideal_answer": "Because language models optimize for plausible text generation, not truth, so they can produce coherent explanations that are logically flawed or based on incorrect assumptions.",
+      "model_answer": "A model can produce fluent reasoning but still arrive at a wrong final answer because:\n\n1. **Pattern Matching Over Understanding:** The model generates text by predicting likely word sequences based on training data, not by truly understanding the problem. It can mimic the style of logical reasoning without verifying correctness.\n\n2. **Surface-Level Coherence:** Fluency and coherence in language don’t guarantee factual or logical accuracy. The model’s reasoning steps may sound plausible but contain subtle errors or incorrect assumptions.\n\n3. **Lack of Ground Truth Checking:** The model doesn’t internally check its conclusions against external facts or calculations unless explicitly designed to do so.\n\n4. **Training Data Limitations:** If the training data includes flawed reasoning or ambiguous examples, the model may reproduce similar mistakes.\n\nIn short, fluent reasoning reflects the model’s language skills, not necessarily its problem-solving accuracy.",
+      "scores": {
+        "correctness": 1,
+        "coverage": 1,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "notes": {
+        "correctness": "The answer correctly explains why a model can produce fluent but incorrect reasoning, aligning with the ideal answer.",
+        "coverage": "The answer covers multiple relevant points including pattern matching, coherence, lack of fact-checking, and training data limitations.",
+        "reasoning": "The explanation is logically sound and justifies why fluent reasoning does not guarantee correctness.",
+        "clarity": "The answer is well-structured with numbered points and a clear summary, making it easy to follow.",
+        "safety": "The answer contains no misinformation or unsafe guidance."
+      },
+      "weighted_score": 1.0,
+      "min_score": 1,
+      "risk_tier": "edge",
+      "decision": "GO",
+      "risk_level": "LOW",
+      "blocking_reasons": []
+    },
+    {
+      "case_id": "c5_q01_eval_definition",
+      "chapter": "chapter5",
+      "tags": [
+        "evaluation",
+        "basics"
+      ],
+      "prompt": "What does evaluation mean in the context of an AI teaching system?",
+      "ideal_answer": "Evaluation means systematically measuring how well the system behaves against defined expectations, such as correctness, coverage, reasoning quality, and safety.",
+      "model_answer": "In an AI teaching system, **evaluation** refers to the process of assessing how well the system or the learner is performing. This can include measuring the learner’s understanding, progress, or skills based on their responses, interactions, or test results. It can also mean assessing the AI system itself—checking if it provides accurate, helpful feedback and adapts effectively to the learner’s needs. Essentially, evaluation helps determine effectiveness and guides improvements.",
+      "scores": {
+        "correctness": 1,
+        "coverage": 1,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "notes": {
+        "correctness": "The answer correctly explains evaluation as assessing performance of both learner and system.",
+        "coverage": "The answer covers key points including correctness, feedback quality, and adaptation, aligning well with the ideal answer.",
+        "reasoning": "The explanation logically connects evaluation to measuring effectiveness and guiding improvements.",
+        "clarity": "The answer is clearly structured and easy to understand.",
+        "safety": "The answer contains no unsafe or misleading information."
+      },
+      "weighted_score": 1.0,
+      "min_score": 1,
+      "risk_tier": "signal",
+      "decision": "GO",
+      "risk_level": "LOW",
+      "blocking_reasons": []
+    },
+    {
+      "case_id": "c5_q02_golden_dataset",
+      "chapter": "chapter5",
+      "tags": [
+        "evaluation",
+        "golden_set"
+      ],
+      "prompt": "What is a golden dataset and why is it important?",
+      "ideal_answer": "A golden dataset is a curated set of representative test cases used repeatedly to detect regressions and ensure consistent behavior across model or prompt changes.",
+      "model_answer": "A **golden dataset** is a carefully curated, high-quality dataset that serves as a reliable reference or benchmark for training, validating, or testing machine learning models. It typically contains accurately labeled, clean, and representative data.\n\n**Why it’s important:**\n- Ensures model training on trustworthy data, improving accuracy.\n- Provides a standard for evaluating and comparing model performance.\n- Helps identify errors or biases in other datasets.\n- Supports reproducibility and consistency in experiments.\n\nIn short, a golden dataset acts as a “ground truth” to guide and validate machine learning efforts.",
+      "scores": {
+        "correctness": 1,
+        "coverage": 1,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "notes": {
+        "correctness": "The answer correctly defines a golden dataset and its purpose without errors.",
+        "coverage": "The answer covers the definition and importance, including repeated use for benchmarking and ensuring consistency.",
+        "reasoning": "The explanation logically connects the dataset's qualities to its importance in model training and evaluation.",
+        "clarity": "The answer is well-structured with bullet points and a clear summary, making it easy to understand.",
+        "safety": "The answer contains no unsafe or misleading information."
+      },
+      "weighted_score": 1.0,
+      "min_score": 1,
+      "risk_tier": "signal",
+      "decision": "GO",
+      "risk_level": "LOW",
+      "blocking_reasons": []
+    },
+    {
+      "case_id": "c5_q03_eval_vs_accuracy_only",
+      "chapter": "chapter5",
+      "tags": [
+        "evaluation",
+        "metrics"
+      ],
+      "prompt": "Why is looking at just a single accuracy number not enough to fully evaluate an AI teaching system?",
+      "ideal_answer": "A single accuracy number hides important details like failure types, reasoning quality, coverage gaps, and safety issues, which are critical for real-world decision-making.",
+      "model_answer": "Looking at just a single accuracy number is not enough because accuracy alone doesn’t capture the full picture of an AI teaching system’s performance. For example:\n\n- It ignores how well the system handles different types of errors (false positives vs. false negatives).\n- It doesn’t show how the system performs across diverse student groups or content areas.\n- It overlooks other important factors like engagement, adaptability, or the quality of feedback.\n- Accuracy can be misleading if the data is imbalanced (e.g., many easy questions skew results).\n\nA comprehensive evaluation should include multiple metrics and qualitative insights to understand effectiveness and impact fully.",
+      "scores": {
+        "correctness": 1,
+        "coverage": 1,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "notes": {
+        "correctness": "The answer correctly explains why a single accuracy number is insufficient, mentioning error types, data imbalance, and other factors.",
+        "coverage": "The answer covers multiple key points including error types, diverse groups, engagement, adaptability, and data imbalance, aligning well with the ideal answer's emphasis on hidden details.",
+        "reasoning": "The explanation logically connects the limitations of accuracy to the need for multiple metrics and qualitative insights.",
+        "clarity": "The answer is well-structured with bullet points and clear language, making it easy to follow.",
+        "safety": "The answer contains no misinformation or unsafe guidance."
+      },
+      "weighted_score": 1.0,
+      "min_score": 1,
+      "risk_tier": "signal",
+      "decision": "GO",
+      "risk_level": "LOW",
+      "blocking_reasons": []
+    },
+    {
+      "case_id": "c5_q04_eval_for_regression",
+      "chapter": "chapter5",
+      "tags": [
+        "evaluation",
+        "regression"
+      ],
+      "prompt": "How does an evaluation pipeline help you detect regressions when you change prompts, models or system design?",
+      "ideal_answer": "By running the same golden dataset before and after changes, you can compare results, identify regressions, and decide whether to roll back, tweak prompts, or adjust the design.",
+      "model_answer": "An evaluation pipeline helps detect regressions by systematically measuring the performance of your prompts, models, or system changes against a consistent set of metrics and test data. When you update any component, you run the pipeline to compare new results with previous baselines. If performance drops on key metrics or specific test cases, the pipeline flags these regressions, enabling you to identify which changes negatively impacted the system and address them before deployment. This ensures continuous quality and prevents unintended degradations.",
+      "scores": {
+        "correctness": 1,
+        "coverage": 1,
+        "reasoning": 1,
+        "clarity": 1,
+        "safety": 1
+      },
+      "notes": {
+        "correctness": "The answer correctly explains how an evaluation pipeline detects regressions by comparing performance before and after changes.",
+        "coverage": "The answer covers running tests on consistent data, comparing results, identifying regressions, and taking corrective actions, matching the ideal answer's key points.",
+        "reasoning": "The explanation logically connects running the pipeline, detecting performance drops, and addressing regressions before deployment.",
+        "clarity": "The answer is well-structured and clearly explains the process in an easy-to-understand manner.",
+        "safety": "The answer contains no unsafe or misleading information."
+      },
+      "weighted_score": 1.0,
+      "min_score": 1,
+      "risk_tier": "edge",
+      "decision": "GO",
+      "risk_level": "LOW",
+      "blocking_reasons": []
+    }
+  ]
+}

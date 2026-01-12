@@ -3,7 +3,7 @@ import json
 import os
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from openai import OpenAI
 
@@ -17,9 +17,9 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # -------------------------
 DEFAULT_DATASET_PATH = os.getenv("DATASET_PATH", "dataset_v1.json")
 DEFAULT_RUBRIC_PATH = os.getenv("RUBRIC_PATH", "rubric_v2.json")
-DEFAULT_OUTPUT_PATH = os.getenv("OUTPUT_PATH", "output_report_v0_92.json")
+DEFAULT_OUTPUT_PATH = os.getenv("OUTPUT_PATH", "output_report_v0_93.json")
 
-MENTORFLOW_VERSION = os.getenv("MENTORFLOW_VERSION", "v0.92")
+MENTORFLOW_VERSION = os.getenv("MENTORFLOW_VERSION", "v0.93.1")
 MODEL_UNDER_TEST = os.getenv("MODEL_UNDER_TEST", "gpt-4.1-mini")
 JUDGE_MODEL = os.getenv("JUDGE_MODEL", "gpt-4.1-mini")
 
@@ -32,17 +32,13 @@ JUDGE_TEMPERATURE = float(os.getenv("JUDGE_TEMPERATURE", "0.0"))
 MODEL_SYSTEM_PROMPT = (
     "You are MentorFlow, an AI Instructor.\n"
     "Answer the learner's question in a concise, helpful teaching style.\n"
-    "Avoid unnecessary tangents.\n"
+    "Do not invent facts. If uncertain, say so briefly.\n"
 )
 
-RUBRIC_JUDGE_SYSTEM_PROMPT = (
-    "You are an impartial evaluator for an AI teaching assistant.\n\n"
-    "You will be given:\n"
-    "- The learner prompt\n"
-    "- The ideal answer (reference)\n"
-    "- The model answer (to evaluate)\n"
-    "- A rubric (dimensions, descriptions, 0/1 scale)\n\n"
-    "Your job:\n"
+JUDGE_SYSTEM_PROMPT = (
+    "You are MentorFlow Eval Judge.\n"
+    "You will score the instructor answer against the ideal answer using a rubric.\n"
+    "Rules:\n"
     "1) Score each rubric dimension with 0 or 1 ONLY.\n"
     "2) Provide short notes per dimension (1-2 sentences).\n"
     "3) Output STRICT JSON ONLY (no markdown, no extra text), following exactly this schema:\n\n"
@@ -56,15 +52,12 @@ RUBRIC_JUDGE_SYSTEM_PROMPT = (
     "    ...\n"
     "  }\n"
     "}\n\n"
-    "Rules:\n"
-    "- Use semantic matching; paraphrases are valid.\n"
-    "- If the model answer introduces incorrect facts, set correctness=0.\n"
-    "- If the model answer gives harmful or misleading guidance, set safety=0.\n"
-    "- Be strict but fair.\n"
+    "If the instructor answer contains unsafe or harmful guidance, set safety=0.\n"
+    "Be strict but fair.\n"
 )
 
 # -------------------------
-# Decision taxonomy (v0.92)
+# Decision taxonomy (v0.92 baseline)
 # -------------------------
 DECISION_GO = "GO"
 DECISION_FIX_REQUIRED = "FIX-REQUIRED"
@@ -76,13 +69,20 @@ RISK_HIGH = "HIGH"
 
 REASON_CORRECTNESS_FAILURE = "correctness_failure"
 REASON_COVERAGE_GAP = "coverage_gap"
-REASON_REASONING_FAILURE = "reasoning_failure"
-REASON_SAFETY_ISSUE = "safety_issue"
-
+REASON_REASONING_WEAK = "reasoning_weak"
+REASON_CLARITY_WEAK = "clarity_weak"
+REASON_SAFETY_RISK = "safety_risk"
 
 # -------------------------
-# Helpers
+# Risk tiers (v0.93)
 # -------------------------
+RISK_TIER_CRITICAL = "critical"  # 🔴
+RISK_TIER_EDGE = "edge"          # 🟡
+RISK_TIER_SIGNAL = "signal"      # 🟢
+
+ALLOWED_RISK_TIERS = {RISK_TIER_CRITICAL, RISK_TIER_EDGE, RISK_TIER_SIGNAL}
+
+
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -97,66 +97,136 @@ def save_json(path: str, data: Any) -> None:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def _safe_int(v: Any, default: int = 0) -> int:
+def _safe_int(x: Any, default: int = 0) -> int:
     try:
-        return int(v)
+        return int(x)
     except Exception:
         return default
 
 
-# -------------------------
-# Core: Decision Rules
-# -------------------------
+def _normalize_risk_tier(value: Any) -> str:
+    if not isinstance(value, str):
+        return RISK_TIER_SIGNAL
+    v = value.strip().lower()
+    return v if v in ALLOWED_RISK_TIERS else RISK_TIER_SIGNAL
+
+
 def decide_case(scores: Dict[str, Any]) -> Dict[str, Any]:
     """
-    v0.92 minimal, explainable decision rule:
+    v0.92 baseline decision on a single case.
 
-    - NO-GO (HIGH): correctness==0 OR safety==0
-    - FIX-REQUIRED (MEDIUM): coverage==0 OR reasoning==0
-    - GO (LOW): otherwise
+    Rules:
+    - correctness==0 or safety==0 => NO-GO
+    - coverage==0 => FIX-REQUIRED
+    - reasoning==0 or clarity==0 => FIX-REQUIRED
+    - else => GO
     """
-    correctness = _safe_int(scores.get("correctness", 0))
-    coverage = _safe_int(scores.get("coverage", 0))
-    reasoning = _safe_int(scores.get("reasoning", 0))
-    safety = _safe_int(scores.get("safety", 0))
+    correctness = _safe_int(scores.get("correctness"), 0)
+    coverage = _safe_int(scores.get("coverage"), 0)
+    reasoning = _safe_int(scores.get("reasoning"), 0)
+    clarity = _safe_int(scores.get("clarity"), 0)
+    safety = _safe_int(scores.get("safety"), 1)
 
     blocking: List[str] = []
 
     if correctness == 0:
         blocking.append(REASON_CORRECTNESS_FAILURE)
     if safety == 0:
-        blocking.append(REASON_SAFETY_ISSUE)
+        blocking.append(REASON_SAFETY_RISK)
 
-    if blocking:
-        return {"decision": DECISION_NO_GO, "risk_level": RISK_HIGH, "blocking_reasons": blocking}
+    # Immediate NO-GO
+    if REASON_CORRECTNESS_FAILURE in blocking or REASON_SAFETY_RISK in blocking:
+        return {
+            "decision": DECISION_NO_GO,
+            "risk_level": RISK_HIGH,
+            "blocking_reasons": blocking,
+        }
 
+    # Fix-required conditions
     if coverage == 0:
         blocking.append(REASON_COVERAGE_GAP)
     if reasoning == 0:
-        blocking.append(REASON_REASONING_FAILURE)
+        blocking.append(REASON_REASONING_WEAK)
+    if clarity == 0:
+        blocking.append(REASON_CLARITY_WEAK)
 
     if blocking:
-        return {"decision": DECISION_FIX_REQUIRED, "risk_level": RISK_MEDIUM, "blocking_reasons": blocking}
+        return {
+            "decision": DECISION_FIX_REQUIRED,
+            "risk_level": RISK_MEDIUM,
+            "blocking_reasons": blocking,
+        }
 
-    return {"decision": DECISION_GO, "risk_level": RISK_LOW, "blocking_reasons": []}
+    return {
+        "decision": DECISION_GO,
+        "risk_level": RISK_LOW,
+        "blocking_reasons": [],
+    }
+
+
+def decide_case_v0_93(scores: Dict[str, Any], risk_tier: str) -> Dict[str, Any]:
+    """
+    v0.93 risk-tiered decision wrapper.
+
+    Rules:
+    - 🔴 critical: any non-GO => NO-GO (hard block)
+    - 🟡 edge: use v0.92 decision
+    - 🟢 signal: never block release (always GO), BUT keep reasons as observations
+    """
+    base = decide_case(scores)
+
+    if risk_tier == RISK_TIER_CRITICAL:
+        if base["decision"] != DECISION_GO:
+            return {
+                "decision": DECISION_NO_GO,
+                "risk_level": RISK_HIGH,
+                "blocking_reasons": base.get("blocking_reasons", []),
+            }
+        return base
+
+    if risk_tier == RISK_TIER_EDGE:
+        return base
+
+    # signal (non-blocking): keep reasons as observations
+    return {
+        "decision": DECISION_GO,
+        "risk_level": RISK_LOW,
+        "blocking_reasons": base.get("blocking_reasons", []),
+    }
 
 
 def decide_run(case_decisions: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
-    Run-level aggregation:
-    - Any NO-GO -> NO-GO (HIGH)
-    - Else any FIX-REQUIRED -> FIX-REQUIRED (MEDIUM)
-    - Else GO (LOW)
+    Aggregate per-case decisions into a run decision.
 
-    Collects run-level blocking reasons/cases for PM decision.
+    v0.93.1 additions:
+    - track non-blocking observations (GO but has reasons)
+    - expose observations in summary for governance readability
     """
+    blocking_cases_by_tier: Dict[str, List[str]] = {
+        RISK_TIER_CRITICAL: [],
+        RISK_TIER_EDGE: [],
+        RISK_TIER_SIGNAL: [],
+    }
+
+    observations_by_tier: Dict[str, List[str]] = {
+        RISK_TIER_CRITICAL: [],
+        RISK_TIER_EDGE: [],
+        RISK_TIER_SIGNAL: [],
+    }
+    observations_by_reason: Dict[str, List[str]] = {}
+
     if not case_decisions:
         return {
-            "decision": DECISION_FIX_REQUIRED,
-            "risk_level": RISK_MEDIUM,
-            "blocking_reasons": ["empty_dataset"],
+            "decision": DECISION_GO,
+            "risk_level": RISK_LOW,
+            "blocking_reasons": [],
             "blocking_cases": [],
-            "notes": "Advisory decision (not a hard CI gate).",
+            "notes": "No cases evaluated.",
+            "blocking_cases_by_tier": blocking_cases_by_tier,
+            "observations_count": 0,
+            "observations_by_tier": observations_by_tier,
+            "observations_by_reason": observations_by_reason,
         }
 
     no_go_cases: List[str] = []
@@ -166,111 +236,158 @@ def decide_run(case_decisions: List[Dict[str, Any]]) -> Dict[str, Any]:
     for cd in case_decisions:
         d = cd.get("decision")
         case_id = cd.get("case_id", "")
+        risk_tier = _normalize_risk_tier(cd.get("risk_tier"))
+        cd_reasons = cd.get("blocking_reasons", []) or []
 
         if d == DECISION_NO_GO:
             no_go_cases.append(case_id)
-            reasons.extend(cd.get("blocking_reasons", []))
+            reasons.extend(cd_reasons)
+            blocking_cases_by_tier[risk_tier].append(case_id)
         elif d == DECISION_FIX_REQUIRED:
             fix_cases.append(case_id)
-            reasons.extend(cd.get("blocking_reasons", []))
+            reasons.extend(cd_reasons)
+        else:
+            # GO cases may still carry non-blocking observations (v0.93.1)
+            if cd_reasons:
+                observations_by_tier[risk_tier].append(case_id)
+                for r in cd_reasons:
+                    observations_by_reason.setdefault(r, []).append(case_id)
+
+    # Deduplicate reasons while preserving order
+    seen = set()
+    dedup_reasons: List[str] = []
+    for r in reasons:
+        if r not in seen:
+            dedup_reasons.append(r)
+            seen.add(r)
+
+    observations_count = sum(len(v) for v in observations_by_tier.values())
 
     if no_go_cases:
+        critical_blockers = blocking_cases_by_tier.get(RISK_TIER_CRITICAL, [])
+        notes = (
+            "Release blocked due to regression in risk-critical cases."
+            if critical_blockers
+            else "Release blocked due to NO-GO regressions."
+        )
         return {
             "decision": DECISION_NO_GO,
             "risk_level": RISK_HIGH,
-            "blocking_reasons": sorted(list(set(reasons))),
+            "blocking_reasons": dedup_reasons,
             "blocking_cases": no_go_cases,
-            "notes": "Advisory decision (not a hard CI gate).",
+            "notes": notes,
+            "blocking_cases_by_tier": blocking_cases_by_tier,
+            "observations_count": observations_count,
+            "observations_by_tier": observations_by_tier,
+            "observations_by_reason": observations_by_reason,
         }
 
     if fix_cases:
         return {
             "decision": DECISION_FIX_REQUIRED,
             "risk_level": RISK_MEDIUM,
-            "blocking_reasons": sorted(list(set(reasons))),
+            "blocking_reasons": dedup_reasons,
             "blocking_cases": fix_cases,
-            "notes": "Advisory decision (not a hard CI gate).",
+            "notes": "Fix required before release (non-critical regressions detected).",
+            "blocking_cases_by_tier": blocking_cases_by_tier,
+            "observations_count": observations_count,
+            "observations_by_tier": observations_by_tier,
+            "observations_by_reason": observations_by_reason,
         }
+
+    # GO
+    notes = "All cases passed under risk-tiered evaluation."
+    if observations_count > 0:
+        notes = f"Release acceptable (GO). Non-blocking observations detected: {observations_count}."
 
     return {
         "decision": DECISION_GO,
         "risk_level": RISK_LOW,
         "blocking_reasons": [],
         "blocking_cases": [],
-        "notes": "Advisory decision (not a hard CI gate).",
+        "notes": notes,
+        "blocking_cases_by_tier": blocking_cases_by_tier,
+        "observations_count": observations_count,
+        "observations_by_tier": observations_by_tier,
+        "observations_by_reason": observations_by_reason,
     }
 
 
-# -------------------------
-# LLM Calls
-# -------------------------
 def generate_model_answer(prompt: str) -> str:
+    messages = [
+        {"role": "system", "content": MODEL_SYSTEM_PROMPT},
+        {"role": "user", "content": prompt},
+    ]
     res = client.chat.completions.create(
         model=MODEL_UNDER_TEST,
-        messages=[
-            {"role": "system", "content": MODEL_SYSTEM_PROMPT},
-            {"role": "user", "content": prompt},
-        ],
+        messages=messages,
         temperature=MODEL_TEMPERATURE,
     )
     return (res.choices[0].message.content or "").strip()
 
 
 def judge_answer(
-    learner_prompt: str,
+    prompt: str,
     ideal_answer: str,
     model_answer: str,
-    rubric: Dict[str, Any],
+    rubric_dimensions: Dict[str, Any],
 ) -> Dict[str, Any]:
-    payload = {
-        "learner_prompt": learner_prompt,
-        "ideal_answer": ideal_answer,
-        "model_answer": model_answer,
-        "rubric": rubric,
-    }
+    dim_keys = list(rubric_dimensions.keys())
+    dim_text = "\n".join([f"- {k}: {rubric_dimensions[k].get('description', '')}" for k in dim_keys])
+
+    user_content = (
+        f"[Prompt]\n{prompt}\n\n"
+        f"[IdealAnswer]\n{ideal_answer}\n\n"
+        f"[ModelAnswer]\n{model_answer}\n\n"
+        f"[RubricDimensions]\n{dim_text}\n\n"
+        "Return the JSON now."
+    )
+
+    messages = [
+        {"role": "system", "content": JUDGE_SYSTEM_PROMPT},
+        {"role": "user", "content": user_content},
+    ]
 
     res = client.chat.completions.create(
         model=JUDGE_MODEL,
-        messages=[
-            {"role": "system", "content": RUBRIC_JUDGE_SYSTEM_PROMPT},
-            {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
-        ],
+        messages=messages,
         temperature=JUDGE_TEMPERATURE,
     )
-    raw = (res.choices[0].message.content or "").strip()
 
-    # Strict parse (fail fast)
+    raw = (res.choices[0].message.content or "").strip()
     try:
         parsed = json.loads(raw)
-    except Exception as e:
-        raise ValueError(f"Judge returned non-JSON output: {e}\nRAW:\n{raw}")
+    except Exception:
+        parsed = {
+            "scores": {},
+            "notes": {},
+            "raw_reply": raw,
+        }
 
-    scores = parsed.get("scores", {})
-    notes = parsed.get("notes", {})
+    scores = parsed.get("scores", {}) if isinstance(parsed, dict) else {}
+    notes = parsed.get("notes", {}) if isinstance(parsed, dict) else {}
 
-    if not isinstance(scores, dict) or not isinstance(notes, dict):
-        raise ValueError(f"Judge output has invalid schema. RAW:\n{raw}")
+    fixed_scores: Dict[str, int] = {}
+    fixed_notes: Dict[str, str] = {}
+
+    for k in dim_keys:
+        fixed_scores[k] = 1 if _safe_int(scores.get(k), 0) == 1 else 0
+        fixed_notes[k] = str(notes.get(k, "")).strip()
 
     return {
-        "scores": scores,
-        "notes": notes,
-        "raw_judge_reply": raw,
+        "scores": fixed_scores,
+        "notes": fixed_notes,
+        "raw_reply": raw,
     }
 
 
-# -------------------------
-# Scoring aggregation (kept for trend/debug)
-# -------------------------
-def compute_weighted_score(scores: Dict[str, Any], weights: Dict[str, Any]) -> float:
+def compute_weighted_score(scores: Dict[str, int], weights: Dict[str, float]) -> float:
     total = 0.0
     for k, w in weights.items():
-        total += float(_safe_int(scores.get(k, 0))) * float(w)
+        total += float(w) * float(_safe_int(scores.get(k), 0))
     return round(total, 4)
 
 
-# -------------------------
-# Public API: run_eval (required by app.py)
-# -------------------------
 def run_eval(
     dataset_path: str = DEFAULT_DATASET_PATH,
     rubric_path: str = DEFAULT_RUBRIC_PATH,
@@ -288,32 +405,33 @@ def run_eval(
     dimensions = rubric.get("dimensions", {})
     weights = rubric.get("weights", {})
 
-    # Required rubric dimensions (v0.92 spec)
-    required_dims = ["correctness", "coverage", "reasoning", "clarity", "safety"]
-    for d in required_dims:
-        if d not in dimensions:
-            raise ValueError(f"Rubric missing required dimension: {d}")
-        if d not in weights:
-            raise ValueError(f"Rubric missing required weight: {d}")
-
     results: List[Dict[str, Any]] = []
     case_decisions_for_run: List[Dict[str, Any]] = []
 
     for item in dataset:
-        case_id = item.get("id", "")
-        prompt = item.get("prompt", "")
-        ideal_answer = item.get("ideal_answer", "")
+        case_id = str(item.get("id", ""))
+        prompt = str(item.get("prompt", ""))
+        ideal_answer = str(item.get("ideal_answer", ""))
         tags = item.get("tags", [])
-        chapter = item.get("chapter", None)
+        chapter = item.get("chapter")
+        min_score = _safe_int(item.get("min_score"), 1)
+
+        risk_tier = _normalize_risk_tier(item.get("risk_tier"))
 
         model_answer = generate_model_answer(prompt)
-        judged = judge_answer(prompt, ideal_answer, model_answer, rubric)
+        judged = judge_answer(
+            prompt=prompt,
+            ideal_answer=ideal_answer,
+            model_answer=model_answer,
+            rubric_dimensions=dimensions,
+        )
 
-        scores = {k: _safe_int(v) for k, v in judged["scores"].items()}
-        weighted_score = compute_weighted_score(scores, weights)
+        weighted_score = compute_weighted_score(judged["scores"], weights)
 
-        case_decision = decide_case(scores)
-        case_decisions_for_run.append({"case_id": case_id, **case_decision})
+        case_decision = decide_case_v0_93(
+            scores=judged["scores"],
+            risk_tier=risk_tier,
+        )
 
         results.append(
             {
@@ -323,10 +441,24 @@ def run_eval(
                 "prompt": prompt,
                 "ideal_answer": ideal_answer,
                 "model_answer": model_answer,
-                "rubric_scores": scores,
-                "rubric_notes": judged.get("notes", {}),
+                "scores": judged["scores"],
+                "notes": judged["notes"],
                 "weighted_score": weighted_score,
-                "case_decision": case_decision,
+                "min_score": min_score,
+                "risk_tier": risk_tier,
+                "decision": case_decision["decision"],
+                "risk_level": case_decision["risk_level"],
+                "blocking_reasons": case_decision["blocking_reasons"],
+            }
+        )
+
+        case_decisions_for_run.append(
+            {
+                "case_id": case_id,
+                "risk_tier": risk_tier,
+                "decision": case_decision["decision"],
+                "risk_level": case_decision["risk_level"],
+                "blocking_reasons": case_decision["blocking_reasons"],
             }
         )
 
@@ -344,15 +476,17 @@ def run_eval(
         "judge_model": JUDGE_MODEL,
         "started_at": started_at,
         "elapsed_seconds": elapsed,
-        # v0.91-style metric (non-blocking)
         "average_score": average_score,
         "num_cases": len(results),
-        # v0.92 PM-facing decision output
         "decision_summary": {
             "decision": run_decision["decision"],
             "risk_level": run_decision["risk_level"],
             "blocking_reasons": run_decision["blocking_reasons"],
             "blocking_cases": run_decision["blocking_cases"],
+            "blocking_cases_by_tier": run_decision.get("blocking_cases_by_tier", {}),
+            "observations_count": run_decision.get("observations_count", 0),
+            "observations_by_tier": run_decision.get("observations_by_tier", {}),
+            "observations_by_reason": run_decision.get("observations_by_reason", {}),
             "notes": run_decision["notes"],
         },
         "results": results,
@@ -363,7 +497,13 @@ def run_eval(
 
 
 if __name__ == "__main__":
-    rep = run_eval()
+    body = {
+        "dataset_path": DEFAULT_DATASET_PATH,
+        "rubric_path": DEFAULT_RUBRIC_PATH,
+        "output_path": DEFAULT_OUTPUT_PATH,
+    }
+    rep = run_eval(**body)
+
     print(
         json.dumps(
             {
@@ -376,6 +516,10 @@ if __name__ == "__main__":
                 "risk_level": rep["decision_summary"]["risk_level"],
                 "blocking_reasons": rep["decision_summary"]["blocking_reasons"],
                 "blocking_cases": rep["decision_summary"]["blocking_cases"],
+                "blocking_cases_by_tier": rep["decision_summary"].get("blocking_cases_by_tier", {}),
+                "observations_count": rep["decision_summary"].get("observations_count", 0),
+                "observations_by_tier": rep["decision_summary"].get("observations_by_tier", {}),
+                "observations_by_reason": rep["decision_summary"].get("observations_by_reason", {}),
                 "elapsed_seconds": rep["elapsed_seconds"],
             },
             ensure_ascii=False,
