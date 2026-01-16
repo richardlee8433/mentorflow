@@ -1,11 +1,18 @@
 ﻿# eval/evaluator_v3.py
 import json
+import logging
 import os
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from openai import OpenAI
+
+# -------------------------
+# Logging
+# -------------------------
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
+logger = logging.getLogger("mentorflow_eval")
 
 # -------------------------
 # OpenAI Client
@@ -17,9 +24,12 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # -------------------------
 DEFAULT_DATASET_PATH = os.getenv("DATASET_PATH", "dataset_v1.json")
 DEFAULT_RUBRIC_PATH = os.getenv("RUBRIC_PATH", "rubric_v2.json")
-DEFAULT_OUTPUT_PATH = os.getenv("OUTPUT_PATH", "output_report_v0_93.json")
+DEFAULT_OUTPUT_PATH = os.getenv("OUTPUT_PATH", "output_report_v0_94.json")
 
-MENTORFLOW_VERSION = os.getenv("MENTORFLOW_VERSION", "v0.93.1")
+# Optional: write promoted cases (learning loop) into a sidecar json file
+DEFAULT_LEARNING_OUTPUT_PATH = os.getenv("LEARNING_OUTPUT_PATH", "")
+
+MENTORFLOW_VERSION = os.getenv("MENTORFLOW_VERSION", "v0.94.0")
 MODEL_UNDER_TEST = os.getenv("MODEL_UNDER_TEST", "gpt-4.1-mini")
 JUDGE_MODEL = os.getenv("JUDGE_MODEL", "gpt-4.1-mini")
 
@@ -81,6 +91,28 @@ RISK_TIER_EDGE = "edge"          # 🟡
 RISK_TIER_SIGNAL = "signal"      # 🟢
 
 ALLOWED_RISK_TIERS = {RISK_TIER_CRITICAL, RISK_TIER_EDGE, RISK_TIER_SIGNAL}
+
+# -------------------------
+# Failure taxonomy (v0.94)
+# -------------------------
+FAILURE_HALLUCINATION = "hallucination"
+FAILURE_COVERAGE_GAP = "coverage_gap"
+FAILURE_OVER_INSTRUCTION = "over_instruction"
+FAILURE_LANGUAGE_FALLBACK = "language_fallback"
+FAILURE_SAFETY_MISALIGNMENT = "safety_misalignment"
+
+# ✅ renamed (v0.94.0 canonical)
+FAILURE_REASONING_GAP = "reasoning_gap"
+
+FAILURE_TYPES: Set[str] = {
+    FAILURE_HALLUCINATION,
+    FAILURE_COVERAGE_GAP,
+    FAILURE_OVER_INSTRUCTION,
+    FAILURE_LANGUAGE_FALLBACK,
+    FAILURE_SAFETY_MISALIGNMENT,
+    FAILURE_REASONING_GAP,
+}
+
 
 
 def utc_now_iso() -> str:
@@ -195,6 +227,63 @@ def decide_case_v0_93(scores: Dict[str, Any], risk_tier: str) -> Dict[str, Any]:
     }
 
 
+def classify_failure_type(scores: Dict[str, Any], risk_tier: str) -> Optional[str]:
+    """
+    v0.94: rule-based failure classification.
+    Conservative and explainable; one failure_type at most.
+
+    Priority:
+    - safety_misalignment (if safety==0)
+    - hallucination (if correctness==0)
+    - coverage_gap (if coverage==0)
+    - reasoning_gap (if reasoning==0)
+    - else None
+    """
+    safety = _safe_int(scores.get("safety"), 1)
+    correctness = _safe_int(scores.get("correctness"), 1)
+    coverage = _safe_int(scores.get("coverage"), 1)
+    reasoning = _safe_int(scores.get("reasoning"), 1)
+
+    if safety == 0:
+        return FAILURE_SAFETY_MISALIGNMENT
+
+    if correctness == 0:
+        return FAILURE_HALLUCINATION
+
+    if coverage == 0:
+        return FAILURE_COVERAGE_GAP
+
+    if reasoning == 0:
+        return FAILURE_REASONING_GAP
+
+    # v0.94 doesn't auto-detect over_instruction / language_fallback yet (reserved taxonomy)
+    _ = risk_tier  # keep signature stable for later expansion
+    return None
+
+
+
+def should_promote_to_golden(risk_tier: str, failure_type: Optional[str]) -> bool:
+    """
+    v0.94: failure -> eval learning loop (promotion rule).
+
+    Promote if:
+    - risk_tier is critical, OR
+    - failure_type is hallucination / safety_misalignment
+
+    (edge/signal + coverage_gap/reasoning_gap stay as tracked failures by default)
+    """
+    if not failure_type:
+        return False
+
+    if risk_tier == RISK_TIER_CRITICAL:
+        return True
+
+    if failure_type in {FAILURE_HALLUCINATION, FAILURE_SAFETY_MISALIGNMENT}:
+        return True
+
+    return False
+
+
 def decide_run(case_decisions: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
     Aggregate per-case decisions into a run decision.
@@ -246,6 +335,8 @@ def decide_run(case_decisions: List[Dict[str, Any]]) -> Dict[str, Any]:
         elif d == DECISION_FIX_REQUIRED:
             fix_cases.append(case_id)
             reasons.extend(cd_reasons)
+            # v0.94: keep tier visibility for FIX-REQUIRED too
+            blocking_cases_by_tier[risk_tier].append(case_id)
         else:
             # GO cases may still carry non-blocking observations (v0.93.1)
             if cd_reasons:
@@ -295,7 +386,6 @@ def decide_run(case_decisions: List[Dict[str, Any]]) -> Dict[str, Any]:
             "observations_by_reason": observations_by_reason,
         }
 
-    # GO
     notes = "All cases passed under risk-tiered evaluation."
     if observations_count > 0:
         notes = f"Release acceptable (GO). Non-blocking observations detected: {observations_count}."
@@ -388,6 +478,45 @@ def compute_weighted_score(scores: Dict[str, int], weights: Dict[str, float]) ->
     return round(total, 4)
 
 
+def _build_failure_stats(failure_types: List[Optional[str]], risk_tiers: List[str]) -> Dict[str, Any]:
+    total_failures = sum(1 for ft in failure_types if ft)
+
+    by_type: Dict[str, int] = {}
+    for ft in failure_types:
+        if not ft:
+            continue
+        by_type[ft] = by_type.get(ft, 0) + 1
+
+    by_risk_tier: Dict[str, int] = {
+        RISK_TIER_CRITICAL: 0,
+        RISK_TIER_EDGE: 0,
+        RISK_TIER_SIGNAL: 0,
+    }
+    for ft, rt in zip(failure_types, risk_tiers):
+        if ft:
+            by_risk_tier[rt] = by_risk_tier.get(rt, 0) + 1
+
+    return {
+        "total_failures": total_failures,
+        "by_type": by_type,
+        "by_risk_tier": by_risk_tier,
+    }
+
+
+def _dedupe_promoted_cases(promoted_cases: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    seen: Set[Tuple[str, str]] = set()
+    out: List[Dict[str, Any]] = []
+    for c in promoted_cases:
+        case_id = str(c.get("case_id", ""))
+        failure_type = str(c.get("failure_type", ""))
+        key = (case_id, failure_type)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(c)
+    return out
+
+
 def run_eval(
     dataset_path: str = DEFAULT_DATASET_PATH,
     rubric_path: str = DEFAULT_RUBRIC_PATH,
@@ -408,6 +537,11 @@ def run_eval(
     results: List[Dict[str, Any]] = []
     case_decisions_for_run: List[Dict[str, Any]] = []
 
+    # v0.94 learning loop trackers
+    failure_types_for_stats: List[Optional[str]] = []
+    risk_tiers_for_stats: List[str] = []
+    promoted_cases: List[Dict[str, Any]] = []
+
     for item in dataset:
         case_id = str(item.get("id", ""))
         prompt = str(item.get("prompt", ""))
@@ -417,6 +551,8 @@ def run_eval(
         min_score = _safe_int(item.get("min_score"), 1)
 
         risk_tier = _normalize_risk_tier(item.get("risk_tier"))
+
+        logger.info("Evaluating case", extra={"case_id": case_id, "risk_tier": risk_tier})
 
         model_answer = generate_model_answer(prompt)
         judged = judge_answer(
@@ -432,6 +568,31 @@ def run_eval(
             scores=judged["scores"],
             risk_tier=risk_tier,
         )
+
+        failure_type = None
+        if case_decision.get("blocking_reasons"):
+            failure_type = classify_failure_type(scores=judged["scores"], risk_tier=risk_tier)
+
+        failure_types_for_stats.append(failure_type)
+        risk_tiers_for_stats.append(risk_tier)
+
+        if should_promote_to_golden(risk_tier=risk_tier, failure_type=failure_type):
+            promoted_cases.append(
+                {
+                    "case_id": case_id,
+                    "risk_tier": risk_tier,
+                    "failure_type": failure_type,
+                    "prompt": prompt,
+                    "ideal_answer": ideal_answer,
+                    "model_answer": model_answer,
+                    "scores": judged["scores"],
+                    "notes": judged["notes"],
+                    "tags": tags,
+                    "chapter": chapter,
+                    "created_at": utc_now_iso(),
+                    "source": "eval_promotion_v0_94",
+                }
+            )
 
         results.append(
             {
@@ -449,6 +610,7 @@ def run_eval(
                 "decision": case_decision["decision"],
                 "risk_level": case_decision["risk_level"],
                 "blocking_reasons": case_decision["blocking_reasons"],
+                "failure_type": failure_type,  # v0.94 NEW
             }
         )
 
@@ -468,6 +630,13 @@ def run_eval(
     average_score = round(sum(weighted_scores) / len(weighted_scores), 4) if weighted_scores else 0.0
 
     elapsed = round(time.time() - start_ts, 3)
+
+    failure_stats = _build_failure_stats(
+        failure_types=failure_types_for_stats,
+        risk_tiers=risk_tiers_for_stats,
+    )
+
+    promoted_cases = _dedupe_promoted_cases(promoted_cases)
 
     report: Dict[str, Any] = {
         "run_id": f"mf_eval_{int(start_ts)}",
@@ -489,10 +658,32 @@ def run_eval(
             "observations_by_reason": run_decision.get("observations_by_reason", {}),
             "notes": run_decision["notes"],
         },
+        # v0.94 NEW blocks
+        "failure_stats": failure_stats,
+        "learning_loop": {
+            "promoted_cases_count": len(promoted_cases),
+            "promoted_cases": promoted_cases,
+            "promotion_rule": {
+                "critical_tier_always_promote": True,
+                "promote_failure_types": [FAILURE_HALLUCINATION, FAILURE_SAFETY_MISALIGNMENT],
+            },
+        },
         "results": results,
     }
 
     save_json(output_path, report)
+
+    # Optional: sidecar file for promoted cases (for future auto-merge into dataset)
+    if DEFAULT_LEARNING_OUTPUT_PATH:
+        try:
+            save_json(DEFAULT_LEARNING_OUTPUT_PATH, {"promoted_cases": promoted_cases})
+            logger.info(
+                "Saved learning loop sidecar",
+                extra={"learning_output_path": DEFAULT_LEARNING_OUTPUT_PATH, "count": len(promoted_cases)},
+            )
+        except Exception:
+            logger.exception("Failed to save learning loop sidecar")
+
     return report
 
 
@@ -502,27 +693,26 @@ if __name__ == "__main__":
         "rubric_path": DEFAULT_RUBRIC_PATH,
         "output_path": DEFAULT_OUTPUT_PATH,
     }
+
     rep = run_eval(**body)
 
-    print(
-        json.dumps(
-            {
-                "run_id": rep["run_id"],
-                "mentorflow_version": rep["mentorflow_version"],
-                "model_under_test": rep["model_under_test"],
-                "judge_model": rep["judge_model"],
-                "average_score": rep["average_score"],
-                "decision": rep["decision_summary"]["decision"],
-                "risk_level": rep["decision_summary"]["risk_level"],
-                "blocking_reasons": rep["decision_summary"]["blocking_reasons"],
-                "blocking_cases": rep["decision_summary"]["blocking_cases"],
-                "blocking_cases_by_tier": rep["decision_summary"].get("blocking_cases_by_tier", {}),
-                "observations_count": rep["decision_summary"].get("observations_count", 0),
-                "observations_by_tier": rep["decision_summary"].get("observations_by_tier", {}),
-                "observations_by_reason": rep["decision_summary"].get("observations_by_reason", {}),
-                "elapsed_seconds": rep["elapsed_seconds"],
-            },
-            ensure_ascii=False,
-            indent=2,
-        )
-    )
+    summary = {
+        "run_id": rep["run_id"],
+        "mentorflow_version": rep["mentorflow_version"],
+        "model_under_test": rep["model_under_test"],
+        "judge_model": rep["judge_model"],
+        "average_score": rep["average_score"],
+        "decision": rep["decision_summary"]["decision"],
+        "risk_level": rep["decision_summary"]["risk_level"],
+        "blocking_reasons": rep["decision_summary"]["blocking_reasons"],
+        "blocking_cases": rep["decision_summary"]["blocking_cases"],
+        "blocking_cases_by_tier": rep["decision_summary"].get("blocking_cases_by_tier", {}),
+        "observations_count": rep["decision_summary"].get("observations_count", 0),
+        "observations_by_tier": rep["decision_summary"].get("observations_by_tier", {}),
+        "observations_by_reason": rep["decision_summary"].get("observations_by_reason", {}),
+        "failure_stats": rep.get("failure_stats", {}),
+        "promoted_cases_count": rep.get("learning_loop", {}).get("promoted_cases_count", 0),
+        "elapsed_seconds": rep["elapsed_seconds"],
+    }
+
+    logger.info("Eval run summary:\n%s", json.dumps(summary, ensure_ascii=False, indent=2))
