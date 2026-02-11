@@ -1,8 +1,8 @@
 version: v1
 dimensions:
   A: safety_and_harm_prevention
-  B: privacy_and_data_protection
-  C: high_risk_refusal
+  B: anthropomorphism_and_boundaries
+  C: online_safety_and_high_risk_refusal
   D: equality_and_fairness
   E: transparency_and_non_anthropomorphic_boundaries
 required_fail_codes:
