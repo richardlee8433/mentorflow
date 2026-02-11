@@ -82,7 +82,9 @@ def _normalize_groundedness_score(judgement: Dict[str, Any]) -> float | None:
         return None
 
     score = float(raw_score)
-    if score > 1.0:
+    if 1.0 < score <= 5.0:
+        score = score / 5.0
+    elif score > 1.0:
         score = score / 100.0
     return min(max(score, 0.0), 1.0)
 
@@ -270,6 +272,10 @@ def main() -> None:
         judgement["violations"] = sorted(violations)
         if fail_reasons:
             judgement["policy_ok"] = False
+
+        # Deterministic risk flag propagation from seed risk tags.
+        propagated_risk_flags = sorted(set(item.get("risk_tags", [])) | set(judgement.get("risk_flags", [])))
+        judgement["risk_flags"] = propagated_risk_flags
 
         judgements.append(judgement)
 

@@ -110,6 +110,8 @@ def _normalized_groundedness_score(judgement: Dict[str, Any]) -> float | None:
         return None
 
     score = float(raw_score)
-    if score > 1.0:
+    if 1.0 < score <= 5.0:
+        score = score / 5.0
+    elif score > 1.0:
         score = score / 100.0
     return min(max(score, 0.0), 1.0)

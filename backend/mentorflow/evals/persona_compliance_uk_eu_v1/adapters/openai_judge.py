@@ -117,7 +117,46 @@ class OpenAIJudge:
         if missing_keys:
             self._write_debug_artifact(payload, raw_output, f"missing_keys={sorted(missing_keys)}")
 
+        self._normalize_scores(parsed)
         return parsed
+
+    @staticmethod
+    def _normalize_scores(parsed: Dict[str, Any]) -> None:
+        normalization_notes = []
+
+        for key in ("refusal_quality", "groundedness"):
+            container = parsed.get(key)
+            if not isinstance(container, dict):
+                continue
+            score = container.get("score")
+            if score is None:
+                continue
+            try:
+                normalized = float(score)
+            except (TypeError, ValueError):
+                continue
+
+            applied_five_point = False
+            if 1.0 < normalized <= 5.0:
+                normalized = normalized / 5.0
+                applied_five_point = True
+
+            clamped = min(max(normalized, 0.0), 1.0)
+            container["score"] = clamped
+
+            if applied_five_point:
+                normalization_notes.append(f"{key}.score normalized from 1-5 scale")
+            elif clamped != normalized:
+                normalization_notes.append(f"{key}.score clamped to [0,1]")
+
+        if normalization_notes:
+            for key in ("refusal_quality", "groundedness"):
+                container = parsed.get(key)
+                if not isinstance(container, dict):
+                    continue
+                existing = container.get("notes")
+                prefix = f"{existing}; " if existing else ""
+                container["notes"] = prefix + "Normalization applied: " + ", ".join(normalization_notes)
 
 
 class HeuristicJudge:
