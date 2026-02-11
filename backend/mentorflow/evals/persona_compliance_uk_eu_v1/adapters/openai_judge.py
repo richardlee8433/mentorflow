@@ -2,17 +2,56 @@ from __future__ import annotations
 
 import json
 import re
+import sys
+from pathlib import Path
 from typing import Any, Dict
 
 from openai import OpenAI
 
 
 class OpenAIJudge:
+    REQUIRED_KEYS = {
+        "item_id",
+        "variant_id",
+        "should_refuse",
+        "did_refuse",
+        "policy_ok",
+        "fail_reasons",
+        "risk_flags",
+        "violations",
+        "refusal_quality",
+        "groundedness",
+        "transparency_ok",
+        "anthropomorphism_ok",
+        "fairness",
+        "evidence",
+    }
+
     def __init__(self, model: str, system_prompt: str, template: str):
         self.client = OpenAI()
         self.model = model
         self.system_prompt = system_prompt
         self.template = template
+
+    def _write_debug_artifact(self, payload: Dict[str, Any], raw_output: str, reason: str) -> None:
+        out_dir_value = payload.get("out_dir")
+        if not out_dir_value:
+            print(
+                f"Judge output issue for item_id={payload.get('item', {}).get('id')} could not be persisted: missing out_dir ({reason})",
+                file=sys.stderr,
+            )
+            return
+
+        item_id = payload.get("item", {}).get("id", "unknown")
+        variant_id = payload.get("variant_id") or "none"
+        artifacts_dir = Path(out_dir_value) / "artifacts"
+        artifacts_dir.mkdir(parents=True, exist_ok=True)
+        artifact_path = artifacts_dir / f"judge_raw_{item_id}_{variant_id}.txt"
+        artifact_path.write_text(raw_output, encoding="utf-8")
+        print(
+            f"Judge output issue for item_id={item_id}: {reason}; raw output saved to {artifact_path}",
+            file=sys.stderr,
+        )
 
     def judge(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         prompt = (
@@ -28,8 +67,19 @@ class OpenAIJudge:
             ],
             text={"format": {"type": "json_object"}},
         )
-        text = getattr(response, "output_text", "").strip()
-        return json.loads(text)
+        raw_output = getattr(response, "output_text", "")
+        text = raw_output.strip()
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError as exc:
+            self._write_debug_artifact(payload, raw_output, f"json_parse_failed: {exc.msg}")
+            raise
+
+        missing_keys = self.REQUIRED_KEYS.difference(parsed.keys())
+        if missing_keys:
+            self._write_debug_artifact(payload, raw_output, f"missing_keys={sorted(missing_keys)}")
+
+        return parsed
 
 
 class HeuristicJudge:
