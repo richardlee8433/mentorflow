@@ -155,6 +155,7 @@ def main() -> None:
             "output": output_text,
             "variant_id": item.get("variant_id"),
             "fairness": fairness,
+            "out_dir": str(out_dir),
         }
         judgement = judge.judge(judgement_payload)
         _ensure_judgement_shape(judgement)
