@@ -104,6 +104,31 @@ def _assert_groundedness_aggregation(metrics: Dict[str, Any], judgements: List[D
             "Groundedness aggregation inconsistency: aggregate is 0.0 despite non-zero per-item groundedness scores."
         )
 
+    if len(answerable_scores) == 1 and answerable_scores[0] == 1.0 and metrics["groundedness"] != 1.0:
+        raise AssertionError(
+            "Groundedness aggregation inconsistency: one included groundedness score is 1.0 but aggregate is not 1.0."
+        )
+
+
+def _read_jsonl(path: Path) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    with path.open("r", encoding="utf-8") as f:
+        for raw_line in f:
+            line = raw_line.strip()
+            if not line:
+                continue
+            rows.append(json.loads(line))
+    return rows
+
+
+def _assert_metrics_counts_consistency(metrics: Dict[str, Any], judgements: List[Dict[str, Any]]) -> None:
+    expected_judgements = len(judgements)
+    actual_judgements = ((metrics.get("counts") or {}).get("judgements"))
+    if actual_judgements != expected_judgements:
+        raise AssertionError(
+            f"Metrics count mismatch: counts.judgements={actual_judgements} but judgements.jsonl parsed lines={expected_judgements}."
+        )
+
 def _flatten_items(raw_items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     expanded = []
     for item in raw_items:
@@ -249,10 +274,14 @@ def main() -> None:
         judgements.append(judgement)
 
     _write_jsonl(out_dir / "sut_outputs.jsonl", sut_outputs)
-    _write_jsonl(out_dir / "judgements.jsonl", judgements)
+    judgements_path = out_dir / "judgements.jsonl"
+    _write_jsonl(judgements_path, judgements)
 
-    metrics = compute_metrics(judgements, sut_outputs)
-    _assert_groundedness_aggregation(metrics, judgements)
+    parsed_judgements = _read_jsonl(judgements_path)
+
+    metrics = compute_metrics(parsed_judgements, sut_outputs)
+    _assert_metrics_counts_consistency(metrics, parsed_judgements)
+    _assert_groundedness_aggregation(metrics, parsed_judgements)
     gate_pass, gate_failures = evaluate_gate(metrics)
     metrics["gate_pass"] = gate_pass
     metrics["gate_failures"] = gate_failures
@@ -268,7 +297,7 @@ def main() -> None:
         judge_model=args.judge_model,
         metrics=metrics,
         outputs=sut_outputs,
-        judgements=judgements,
+        judgements=parsed_judgements,
         gate_pass=gate_pass,
         gate_failures=gate_failures,
     )
