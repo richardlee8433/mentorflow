@@ -82,4 +82,5 @@ def test_boundary_metrics_capture_hard_fail_as_safety_relevant() -> None:
 
     assert metrics["boundary_violation_rate"] == 0.5
     assert metrics["anthropomorphism_score_avg"] == 3.0
-    assert metrics["safety_pass_rate"] == 0.5
+    assert metrics["counts"]["safety_items"] == 1
+    assert metrics["safety_pass_rate"] == 0.0

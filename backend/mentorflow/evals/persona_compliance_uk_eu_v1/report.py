@@ -74,6 +74,18 @@ def write_report(
             "monitor",
             True,
         ),
+        (
+            "transparency_violation_rate",
+            metrics.get("transparency_violation_rate", 0.0),
+            "monitor",
+            True,
+        ),
+        (
+            "soft_rubric_violation_rate",
+            metrics.get("soft_rubric_violation_rate", 0.0),
+            "monitor",
+            True,
+        ),
     ]
 
     for name, value, threshold, ok in summary_rows:
@@ -94,13 +106,67 @@ def write_report(
     if grounded_scored_items == 0:
         lines.append("- Groundedness note: no answerable items with groundedness scores; metric defaults to 1.0.")
 
-
     lines += [
         "",
         "## Dimension B summary",
         f"- boundary_violation_rate: `{metrics.get('boundary_violation_rate', 0.0):.6f}`",
         f"- anthropomorphism_score_avg: `{metrics.get('anthropomorphism_score_avg', 5.0):.6f}`",
     ]
+
+    hard_safety_failures = metrics.get("hard_safety_failures", [])
+    lines += [
+        "",
+        "## Safety Gate (Hard Safety Only)",
+        f"- safety_pass_rate: `{metrics.get('safety_pass_rate', 1.0):.6f}`",
+        f"- safety_items: `{(metrics.get('counts') or {}).get('safety_items', 0)}`",
+    ]
+    if hard_safety_failures:
+        lines.append("- hard-safety failures:")
+        for failure in hard_safety_failures:
+            lines.append(
+                f"  - {failure.get('item_id')} variant={failure.get('variant_id')} codes={json.dumps(failure.get('codes', []), ensure_ascii=False)}"
+            )
+    else:
+        lines.append("- hard-safety failures: none")
+
+    transparency_examples: List[Dict[str, Any]] = []
+    for output in outputs:
+        key = (output["item_id"], output.get("variant_id"))
+        judgement = judgement_by_key[key]
+        fail_reasons = judgement.get("fail_reasons") or []
+        transparency_reasons = [
+            reason
+            for reason in fail_reasons
+            if isinstance(reason, dict) and str(reason.get("code", "")).startswith("TRANSPARENCY_")
+        ]
+        if not transparency_reasons:
+            continue
+        quoted_spans = ((judgement.get("evidence") or {}).get("quoted_output_spans") or [])
+        span = quoted_spans[0] if quoted_spans else ""
+        transparency_examples.append(
+            {
+                "item_id": output.get("item_id"),
+                "variant_id": output.get("variant_id"),
+                "span": span,
+            }
+        )
+        if len(transparency_examples) >= 5:
+            break
+
+    lines += [
+        "",
+        "## Transparency & Soft Compliance (Monitoring)",
+        f"- transparency_violation_rate: `{metrics.get('transparency_violation_rate', 0.0):.6f}`",
+        f"- soft_rubric_violation_rate: `{metrics.get('soft_rubric_violation_rate', 0.0):.6f}`",
+    ]
+    if transparency_examples:
+        lines.append("- top missing disclosure examples:")
+        for example in transparency_examples:
+            lines.append(
+                f"  - {example['item_id']} variant={example['variant_id']} span=\"{example['span']}\""
+            )
+    else:
+        lines.append("- top missing disclosure examples: none")
 
     vcounter = Counter(v for j in judgements for v in j.get("violations", []))
     lines += ["", "## Top violation types"]
