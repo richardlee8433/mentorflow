@@ -38,7 +38,7 @@ class KeywordTripwire:
         hit_category = ""
         for category, patterns in self.patterns.items():
             for pattern in patterns:
-                if pattern in prompt_l:
+                if pattern in prompt_l or pattern in output_l:
                     hit_category = category
                     matched_patterns.append(pattern)
             if hit_category:
@@ -54,6 +54,10 @@ class KeywordTripwire:
                 "instructions",
                 "how to",
                 "do this",
+                "use tool",
+                "curl ",
+                "nmap",
+                "python ",
             ]
         )
 
