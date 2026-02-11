@@ -12,24 +12,13 @@ from .adapters.openai_judge import HeuristicJudge, OpenAIJudge
 from .adapters.openai_responses_sut import MockSUT, OpenAIResponsesSUT
 from .adapters.persona_http_sut import PersonaHTTPSUT
 from .build_testbank import build_testbank
+from .fail_codes import CANONICAL_FAIL_CODES, remap_fail_code
 from .metrics import compute_metrics, evaluate_gate
 from .report import write_report
 from .tripwire.keyword_tripwire import KeywordTripwire
 
 
-REQUIRED_FAIL_CODES = {
-    "TRIPWIRE_MISSED_REFUSAL",
-    "JUDGE_REFUSAL_MISMATCH",
-    "UNBOUNDED_RESPONSE",
-    "CONTENT_HALLUCINATION",
-    "VIOLATION_BOUNDARY_RULE",
-    "JUDGE_SHAPE_ERROR",
-    "EVIDENCE_MISSING",
-    "B_H1",
-    "B_H2",
-    "B_H3",
-    "B_H4",
-}
+REQUIRED_FAIL_CODES = CANONICAL_FAIL_CODES
 
 
 def _load_text(path: Path) -> str:
@@ -90,19 +79,19 @@ def normalize_fail_reasons(fail_reasons: Any) -> List[Dict[str, str]]:
                 detail_value = reason.get("detail", "")
                 normalized.append(
                     {
-                        "code": str(code_value) if code_value is not None else "FAIL_REASONS_SHAPE_ERROR",
+                        "code": str(code_value) if code_value is not None else "JUDGE_SHAPE_ERROR",
                         "detail": str(detail_value) if detail_value is not None else "",
                     }
                 )
                 continue
             normalized.append(
                 {
-                    "code": "FAIL_REASONS_SHAPE_ERROR",
+                    "code": "JUDGE_SHAPE_ERROR",
                     "detail": f"Unexpected fail_reasons entry type: {repr(reason)}",
                 }
             )
     else:
-        normalized = [{"code": "FAIL_REASONS_SHAPE_ERROR", "detail": repr(fail_reasons)}]
+        normalized = [{"code": "JUDGE_SHAPE_ERROR", "detail": repr(fail_reasons)}]
 
     repaired: List[Dict[str, str]] = []
     for reason in normalized:
@@ -116,12 +105,16 @@ def normalize_fail_reasons(fail_reasons: Any) -> List[Dict[str, str]]:
             continue
         repaired.append(
             {
-                "code": "FAIL_REASONS_SHAPE_ERROR",
+                "code": "JUDGE_SHAPE_ERROR",
                 "detail": f"Malformed normalized fail_reasons entry: {repr(reason)}",
             }
         )
+    remapped: List[Dict[str, str]] = []
+    for reason in repaired:
+        code, detail = remap_fail_code(reason.get("code", ""), reason.get("detail", ""))
+        remapped.append({"code": code, "detail": detail})
 
-    return repaired
+    return remapped
 
 
 def _append_fail_reason(fail_reasons: List[Dict[str, str]], code: str, detail: str = "") -> None:
@@ -384,11 +377,16 @@ def main() -> None:
         judgement["fail_reasons"] = normalize_fail_reasons(fail_reasons)
         fail_reasons = judgement["fail_reasons"]
 
-        # Enforce required fail codes availability in pipeline vocab using normalized fail reasons only.
-        normalized_codes = {fr.get("code") for fr in fail_reasons if isinstance(fr, dict)}
-        if not REQUIRED_FAIL_CODES.issuperset(normalized_codes):
-            # keep external codes but ensure required vocabulary remains represented when relevant
-            pass
+        # Defensive canonicalization: unknown codes are folded into RUBRIC_OTHER and retained with detail.
+        canonicalized_fail_reasons: List[Dict[str, str]] = []
+        for reason in fail_reasons:
+            code = str(reason.get("code", ""))
+            detail = str(reason.get("detail", ""))
+            if code not in REQUIRED_FAIL_CODES:
+                code, detail = remap_fail_code(code, detail)
+            canonicalized_fail_reasons.append({"code": code, "detail": detail})
+        judgement["fail_reasons"] = canonicalized_fail_reasons
+        fail_reasons = canonicalized_fail_reasons
 
         judgement["violations"] = sorted(violations)
         if fail_reasons:

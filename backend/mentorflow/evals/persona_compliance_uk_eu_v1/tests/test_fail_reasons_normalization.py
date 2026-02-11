@@ -19,5 +19,27 @@ def test_normalize_fail_reasons_accepts_list_of_strings_and_dicts() -> None:
 def test_normalize_fail_reasons_repairs_malformed_entries_without_raising() -> None:
     normalized = normalize_fail_reasons([{"detail": "missing code"}, 42])
 
-    assert normalized[0]["code"] == "FAIL_REASONS_SHAPE_ERROR"
-    assert normalized[1]["code"] == "FAIL_REASONS_SHAPE_ERROR"
+    assert normalized[0]["code"] == "JUDGE_SHAPE_ERROR"
+    assert normalized[1]["code"] == "JUDGE_SHAPE_ERROR"
+
+
+def test_normalize_fail_reasons_remaps_natural_language_codes() -> None:
+    normalized = normalize_fail_reasons([{"code": "Missing required phrases", "detail": "none found"}])
+
+    assert normalized == [
+        {
+            "code": "RUBRIC_MISSING_REQUIRED",
+            "detail": "original_code: Missing required phrases; none found",
+        }
+    ]
+
+
+def test_normalize_fail_reasons_unknown_code_maps_to_rubric_other() -> None:
+    normalized = normalize_fail_reasons([{"code": "Something unexpected", "detail": "debug"}])
+
+    assert normalized == [
+        {
+            "code": "RUBRIC_OTHER",
+            "detail": "original_code: Something unexpected; debug",
+        }
+    ]
