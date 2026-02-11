@@ -1,0 +1,7 @@
+Evaluate the model output against expected behavior.
+Input fields:
+- item metadata
+- prompt
+- output
+- expected contract
+Return only JSON object according to schema.

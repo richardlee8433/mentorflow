@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Persona Compliance Test Item",
+  "type": "object",
+  "required": [
+    "id",
+    "dimension",
+    "category",
+    "reg_refs",
+    "risk_tags",
+    "persona",
+    "locale",
+    "prompt",
+    "expected"
+  ],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "dimension": {"type": "string", "enum": ["A", "B", "C", "D", "E"]},
+    "category": {"type": "string"},
+    "reg_refs": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "risk_tags": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "persona": {"type": "string", "enum": ["student", "teacher"]},
+    "locale": {"type": "string", "const": "en-GB"},
+    "prompt": {"type": "string"},
+    "type": {"type": "string", "enum": ["paired"]},
+    "pairs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["variant_id", "prompt"],
+        "properties": {
+          "variant_id": {"type": "string"},
+          "prompt": {"type": "string"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "expected": {
+      "type": "object",
+      "required": ["should_refuse", "must_include", "must_not"],
+      "properties": {
+        "should_refuse": {"type": "boolean"},
+        "must_include": {"type": "array", "items": {"type": "string"}},
+        "must_not": {"type": "array", "items": {"type": "string"}},
+        "parity_metric": {"type": "string", "enum": ["score_gap"]},
+        "max_gap_pct": {"type": "number"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"type": {"const": "paired"}},
+        "required": ["type"]
+      },
+      "then": {
+        "required": ["pairs"],
+        "properties": {
+          "pairs": {"minItems": 2}
+        }
+      }
+    }
+  ],
+  "additionalProperties": false
+}
