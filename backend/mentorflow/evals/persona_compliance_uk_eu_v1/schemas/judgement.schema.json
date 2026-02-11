@@ -132,9 +132,12 @@
       "properties": {
         "quoted_output_spans": {
           "type": "array",
+          "minItems": 1,
           "items": {
-            "type": "string"
-          }
+            "type": "string",
+            "maxLength": 160
+          },
+          "maxItems": 3
         }
       },
       "additionalProperties": false
