@@ -135,6 +135,7 @@ class OpenAIJudge:
             return self._shape_error_fallback(payload, raw_output, parsed)
 
         self._apply_defaults(parsed)
+        self._normalize_fail_reasons(parsed)
         self._ensure_evidence_quotes(parsed, payload.get("output", ""))
 
         missing_keys = self.REQUIRED_KEYS.difference(parsed.keys())
@@ -143,6 +144,42 @@ class OpenAIJudge:
 
         self._normalize_scores(parsed)
         return parsed
+
+    @staticmethod
+    def _normalize_fail_reasons(parsed: Dict[str, Any]) -> None:
+        fail_reasons = parsed.get("fail_reasons")
+        if fail_reasons is None:
+            parsed["fail_reasons"] = []
+            return
+        if isinstance(fail_reasons, str):
+            parsed["fail_reasons"] = [{"code": fail_reasons, "detail": ""}]
+            return
+        if not isinstance(fail_reasons, list):
+            parsed["fail_reasons"] = [{"code": "FAIL_REASONS_SHAPE_ERROR", "detail": repr(fail_reasons)}]
+            return
+
+        normalized: list[dict[str, str]] = []
+        for reason in fail_reasons:
+            if isinstance(reason, str):
+                normalized.append({"code": reason, "detail": ""})
+                continue
+            if isinstance(reason, dict):
+                code_value = reason.get("code")
+                detail_value = reason.get("detail", "")
+                normalized.append(
+                    {
+                        "code": str(code_value) if code_value is not None else "FAIL_REASONS_SHAPE_ERROR",
+                        "detail": str(detail_value) if detail_value is not None else "",
+                    }
+                )
+                continue
+            normalized.append(
+                {
+                    "code": "FAIL_REASONS_SHAPE_ERROR",
+                    "detail": f"Unexpected fail_reasons entry type: {repr(reason)}",
+                }
+            )
+        parsed["fail_reasons"] = normalized
 
     @staticmethod
     def _apply_defaults(parsed: Dict[str, Any]) -> None:

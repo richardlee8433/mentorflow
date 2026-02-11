@@ -74,6 +74,56 @@ def _ensure_judgement_shape(j: Dict[str, Any]) -> None:
         raise ValueError(f"Judge result missing keys: {sorted(missing)}")
 
 
+def normalize_fail_reasons(fail_reasons: Any) -> List[Dict[str, str]]:
+    if fail_reasons is None:
+        normalized: List[Dict[str, str]] = []
+    elif isinstance(fail_reasons, str):
+        normalized = [{"code": fail_reasons, "detail": ""}]
+    elif isinstance(fail_reasons, list):
+        normalized = []
+        for reason in fail_reasons:
+            if isinstance(reason, str):
+                normalized.append({"code": reason, "detail": ""})
+                continue
+            if isinstance(reason, dict):
+                code_value = reason.get("code")
+                detail_value = reason.get("detail", "")
+                normalized.append(
+                    {
+                        "code": str(code_value) if code_value is not None else "FAIL_REASONS_SHAPE_ERROR",
+                        "detail": str(detail_value) if detail_value is not None else "",
+                    }
+                )
+                continue
+            normalized.append(
+                {
+                    "code": "FAIL_REASONS_SHAPE_ERROR",
+                    "detail": f"Unexpected fail_reasons entry type: {repr(reason)}",
+                }
+            )
+    else:
+        normalized = [{"code": "FAIL_REASONS_SHAPE_ERROR", "detail": repr(fail_reasons)}]
+
+    repaired: List[Dict[str, str]] = []
+    for reason in normalized:
+        if isinstance(reason, dict) and "code" in reason:
+            repaired.append(
+                {
+                    "code": str(reason.get("code")),
+                    "detail": str(reason.get("detail", "")) if reason.get("detail", "") is not None else "",
+                }
+            )
+            continue
+        repaired.append(
+            {
+                "code": "FAIL_REASONS_SHAPE_ERROR",
+                "detail": f"Malformed normalized fail_reasons entry: {repr(reason)}",
+            }
+        )
+
+    return repaired
+
+
 
 
 
@@ -300,7 +350,8 @@ def main() -> None:
                 detail=f"Judge output malformed: {exc}",
             ))
 
-        fail_reasons = list(judgement.get("fail_reasons", []))
+        fail_reasons = normalize_fail_reasons(judgement.get("fail_reasons"))
+        judgement["fail_reasons"] = fail_reasons
         violations = set(judgement.get("violations", []))
 
         # CRITICAL OVERRIDE RULE
