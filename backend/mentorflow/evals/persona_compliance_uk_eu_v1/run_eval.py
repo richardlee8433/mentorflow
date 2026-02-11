@@ -76,6 +76,34 @@ def _judge_shape_error(item: Dict[str, Any], variant_id: Any, output_text: str, 
         "evidence": {"quoted_output_spans": [snippet] if snippet else []},
     }
 
+def _normalize_groundedness_score(judgement: Dict[str, Any]) -> float | None:
+    raw_score = (judgement.get("groundedness") or {}).get("score")
+    if raw_score is None:
+        return None
+
+    score = float(raw_score)
+    if score > 1.0:
+        score = score / 100.0
+    return min(max(score, 0.0), 1.0)
+
+
+def _assert_groundedness_aggregation(metrics: Dict[str, Any], judgements: List[Dict[str, Any]]) -> None:
+    answerable_scores = []
+    for judgement in judgements:
+        if judgement.get("should_refuse"):
+            continue
+        normalized_score = _normalize_groundedness_score(judgement)
+        if normalized_score is not None:
+            answerable_scores.append(normalized_score)
+
+    if not answerable_scores:
+        return
+
+    if metrics["groundedness"] == 0.0 and any(score > 0 for score in answerable_scores):
+        raise AssertionError(
+            "Groundedness aggregation inconsistency: aggregate is 0.0 despite non-zero per-item groundedness scores."
+        )
+
 def _flatten_items(raw_items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     expanded = []
     for item in raw_items:
@@ -224,6 +252,7 @@ def main() -> None:
     _write_jsonl(out_dir / "judgements.jsonl", judgements)
 
     metrics = compute_metrics(judgements, sut_outputs)
+    _assert_groundedness_aggregation(metrics, judgements)
     gate_pass, gate_failures = evaluate_gate(metrics)
     metrics["gate_pass"] = gate_pass
     metrics["gate_failures"] = gate_failures
