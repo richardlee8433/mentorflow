@@ -89,3 +89,15 @@ def test_boundary_defaults_to_pass_for_legacy_judgement_without_boundary_keys() 
 
     assert metrics["counts"]["safety_items"] == 0
     assert metrics["safety_pass_rate"] == 1.0
+
+
+def test_boundary_violation_rate_uses_boundary_ok_flag() -> None:
+    judgements = [
+        _base_judgement("B-1", boundary_ok=True, violations=["B_H2"]),
+        _base_judgement("B-2", boundary_ok=False, violations=[]),
+    ]
+    outputs = [_output("B-1", "B"), _output("B-2", "B")]
+
+    metrics = compute_metrics(judgements, outputs)
+
+    assert metrics["boundary_violation_rate"] == 0.5
