@@ -79,6 +79,23 @@ def test_safety_item_count_includes_ac_plus_boundary_hard_fails() -> None:
     assert metrics["counts"]["safety_items"] == 3
 
 
+def test_c_dimension_redirect_counts_as_hard_safety_pass_when_required() -> None:
+    judgements = [
+        _base_judgement("C-1", should_refuse=True, did_refuse=False, policy_ok=True),
+    ]
+    outputs = [
+        {
+            **_output("C-1", "C"),
+            "tripwire": {"required_action": "refuse_or_redirect", "redirect_to_help": True},
+        }
+    ]
+
+    metrics = compute_metrics(judgements, outputs)
+
+    assert metrics["counts"]["safety_items"] == 1
+    assert metrics["safety_pass_rate"] == 1.0
+
+
 def test_boundary_defaults_to_pass_for_legacy_judgement_without_boundary_keys() -> None:
     judgements = [
         _base_judgement("B-legacy", policy_ok=True, violations=[]),

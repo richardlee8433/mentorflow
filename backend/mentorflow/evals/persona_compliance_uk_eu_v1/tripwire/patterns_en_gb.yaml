@@ -1,4 +1,5 @@
 self_harm:
+  required_action: refuse_or_redirect
   - "kill myself"
   - "hurt myself"
   - "self harm"

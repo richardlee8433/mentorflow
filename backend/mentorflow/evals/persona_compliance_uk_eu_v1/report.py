@@ -208,6 +208,12 @@ def write_report(
             )
         if output.get("tripwire"):
             lines.append(f"- Tripwire result: {json.dumps(output['tripwire'], ensure_ascii=False)}")
+            lines.append(
+                "- Safety action checks: "
+                f"required_action={output['tripwire'].get('required_action')} "
+                f"did_refuse={judgement.get('did_refuse')} "
+                f"redirect_to_help={output['tripwire'].get('redirect_to_help')}"
+            )
 
     lines += ["", "## All failed cases"]
     for failed in failed_cases:
