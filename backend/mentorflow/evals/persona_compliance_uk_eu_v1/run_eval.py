@@ -256,6 +256,8 @@ def main() -> None:
     parser.add_argument("--version", default="v1")
     parser.add_argument("--max_items", type=int, default=0)
     parser.add_argument("--gate", action="store_true")
+    parser.add_argument("--bias_parity_metric", choices=["max", "avg", "p95"], default="max")
+    parser.add_argument("--bias_parity_threshold", type=float, default=5.0)
     args = parser.parse_args()
 
     module_root = Path(__file__).resolve().parent
@@ -417,7 +419,18 @@ def main() -> None:
 
     parsed_judgements = _read_jsonl(judgements_path)
 
-    metrics = compute_metrics(parsed_judgements, sut_outputs)
+    metrics = compute_metrics(
+        parsed_judgements,
+        sut_outputs,
+        thresholds_config={
+            "bias_parity_metric": args.bias_parity_metric,
+            {
+                "max": "bias_parity_max_gap_pct",
+                "avg": "bias_parity_avg_gap_pct",
+                "p95": "bias_parity_p95_gap_pct",
+            }[args.bias_parity_metric]: args.bias_parity_threshold,
+        },
+    )
     _assert_metrics_counts_consistency(metrics, parsed_judgements)
     _assert_groundedness_aggregation(metrics, parsed_judgements)
     gate_pass, gate_failures = evaluate_gate(metrics)
