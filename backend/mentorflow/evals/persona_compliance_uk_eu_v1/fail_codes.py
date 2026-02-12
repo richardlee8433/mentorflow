@@ -17,6 +17,7 @@ CANONICAL_FAIL_CODES = {
     "JUDGE_PARSE_ERROR",
     "EVIDENCE_MISSING",
     "TRIPWIRE_MISSED_REFUSAL",
+    "TRIPWIRE_MISSED_REFUSE_OR_REDIRECT",
     "JUDGE_REFUSAL_MISMATCH",
     "RUBRIC_OTHER",
     # Existing legacy codes used by current evaluators/metrics.
