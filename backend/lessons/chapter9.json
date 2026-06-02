@@ -1,0 +1,126 @@
+{
+  "id": "chapter9",
+  "title": "Practical Tips for Building Agentic AI",
+  "units": [
+    {
+      "id": "chapter9_unit1",
+      "lesson": 9,
+      "unit": "9.1",
+      "title": "Evals: The 2x2 Framework",
+      "material": "Building evals starts with a quick prototype. Examine 10-20 real outputs to discover failure patterns before designing any evaluation. Evals fall into a 2x2 grid: (Axis 1) how you evaluate — code/assertions for objective checks vs LLM-as-judge for subjective assessment; (Axis 2) whether each example has its own ground truth or all share a universal target. Invoice date extraction: code + per-example ground truth. Marketing copy length: code + universal target (10 words). Research coverage: LLM-as-judge + per-example gold standard talking points. Chart rubric scoring: LLM-as-judge + universal rubric. Start with 10-20 examples, iterate as the system matures. Do not wait for perfect evals — start measuring something.",
+      "question": "Describe the 2x2 eval framework with one example from each of the four quadrants.",
+      "key_points": [
+        "Axis 1: code/assertions (objective) vs LLM-as-judge (subjective)",
+        "Axis 2: per-example ground truth vs universal target",
+        "Invoice dates: code + per-example ground truth",
+        "Marketing copy length: code + universal target",
+        "Research coverage: LLM-as-judge + per-example gold standard",
+        "Start small (10-20 examples) and iterate"
+      ],
+      "min_points": 2,
+      "next_unit": "chapter9_unit2"
+    },
+    {
+      "id": "chapter9_unit2",
+      "lesson": 9,
+      "unit": "9.2",
+      "title": "Error Analysis: Reading Traces to Find Root Causes",
+      "material": "Error analysis is examining intermediate outputs (the trace) to identify which component caused a failure — rather than guessing and working on the wrong thing. A trace is the full set of intermediate outputs across all steps. A span is the output of a single step. Process: (1) find examples where the final output is unsatisfactory, (2) read through the trace step-by-step, (3) identify which component's output was subpar compared to what a human expert would produce. Example: research agent missing key points — search terms looked fine (5% error rate), but search results returned too many blog posts (45% error rate). This tells you to fix the web search engine, not the search term generation. Never go by gut — build a spreadsheet and count.",
+      "question": "What is a trace, and how do you use it to carry out error analysis on an agentic workflow?",
+      "key_points": [
+        "Trace: full set of intermediate outputs across all steps of a workflow run",
+        "Span: output of a single step",
+        "Focus on failing examples, not successful ones",
+        "Examine each step and ask: is this output as good as a human expert would produce?",
+        "Build a spreadsheet and count errors per component to find the biggest contributor"
+      ],
+      "min_points": 2,
+      "next_unit": "chapter9_unit3"
+    },
+    {
+      "id": "chapter9_unit3",
+      "lesson": 9,
+      "unit": "9.3",
+      "title": "Error Analysis: More Examples",
+      "material": "Invoice processing: errors may come from PDF-to-text extraction or from the LLM extracting the wrong date field. Error analysis on 20 invoices might show LLM data extraction responsible for most errors — meaning effort should go to improving the LLM prompt, not the PDF parser. Customer email response: three failure modes — wrong database query (75% of errors), corrupted database data (small %), poorly written email (30%). This tells you to prioritise fixing the database query step first. Key insight: errors are not mutually exclusive (percentages can exceed 100%). The value of error analysis is that it prevents weeks or months of work on the wrong component. Prioritise the component that (a) has the most errors AND (b) you have ideas to improve.",
+      "question": "In the customer email example, which component caused 75% of errors and what does this tell you about where to focus your work?",
+      "key_points": [
+        "Database query writing caused 75% of errors — highest priority to fix",
+        "Email writing had 30% errors — second priority",
+        "Database data errors were small — lower priority",
+        "Errors are not mutually exclusive — percentages can exceed 100%",
+        "Prioritise components where: many errors AND you have ideas to improve"
+      ],
+      "min_points": 1,
+      "next_unit": "chapter9_unit4"
+    },
+    {
+      "id": "chapter9_unit4",
+      "lesson": 9,
+      "unit": "9.4",
+      "title": "Component-Level Evaluations",
+      "material": "End-to-end evals measure overall system quality but are expensive and noisy — small improvements to one component may be invisible through the noise of other components. Component-level evals measure just one step in isolation, giving a clearer signal. Example: to evaluate web search quality, create a gold standard list of authoritative web resources for a set of queries, then measure how many of the returned results overlap with the gold standard (using information retrieval metrics like F1 score). This lets you rapidly compare web search engines (Google, Bing, DuckDuckGo, Tavily) or tune parameters (number of results, date range) without running the full workflow. Always run an end-to-end eval to confirm improvement before declaring the component fixed.",
+      "question": "Why are component-level evals more efficient than end-to-end evals when tuning a specific component?",
+      "key_points": [
+        "End-to-end evals are expensive and noise from other components hides small improvements",
+        "Component-level evals give a direct signal for the component you are improving",
+        "Example: gold standard web resources + F1 score to evaluate web search quality",
+        "Enables rapid comparison of search engines and parameter tuning",
+        "Always confirm with an end-to-end eval before declaring the component fixed"
+      ],
+      "min_points": 2,
+      "next_unit": "chapter9_unit5"
+    },
+    {
+      "id": "chapter9_unit5",
+      "lesson": 9,
+      "unit": "9.5",
+      "title": "How to Improve Underperforming Components",
+      "material": "For non-LLM components (web search, RAG retrieval, ML models): tune hyperparameters (number of results, similarity threshold, chunk size, detection threshold) or swap the component for a different provider. For LLM components, try in this order: (1) improve the prompt — add clearer instructions or few-shot examples; (2) try a different LLM — larger frontier models are significantly better at following complex instructions (illustrated by PII redaction: 8B model misses name and format instructions; frontier model succeeds); (3) decompose the task into smaller steps; (4) fine-tune a custom model (expensive, only for mature applications). Build intuition about model capabilities by experimenting frequently, maintaining a personal eval suite, and reading other developers' prompts in open-source projects.",
+      "question": "What is the recommended order of approaches to improve an underperforming LLM component, and why is fine-tuning last?",
+      "key_points": [
+        "Order: improve prompt → try different LLM → decompose task → fine-tune",
+        "Fine-tuning is last because it is costly in developer time and compute",
+        "Larger frontier models are significantly better at following complex instructions",
+        "Few-shot prompting provides concrete examples to guide the model",
+        "Decomposing a complex step into smaller steps can make each step more reliable"
+      ],
+      "min_points": 2,
+      "next_unit": "chapter9_unit6"
+    },
+    {
+      "id": "chapter9_unit6",
+      "lesson": 9,
+      "unit": "9.6",
+      "title": "Latency and Cost Optimisation",
+      "material": "Optimise quality first; address latency and cost only after the system works well. For latency: time each step in the workflow (e.g. search terms 7s, web search 5s, fetch 3s, synthesis 11s, essay 18s). Use this to identify bottlenecks. Options: run parallelisable steps concurrently; try a smaller or faster model for non-critical steps; try different LLM providers (some have specialised hardware for faster inference). For cost: calculate cost per step (tokens × provider rate, API call costs). Identify the most expensive steps and consider cheaper models or fewer API calls. Benchmarking clarifies which components are worth optimising — many will turn out to be negligible contributors to total cost or latency.",
+      "question": "What is the recommended priority order when building an agentic workflow — quality, latency, or cost — and how do you identify latency bottlenecks?",
+      "key_points": [
+        "Priority: output quality first, then latency and cost",
+        "Time each step to identify which takes the longest",
+        "Options: parallelism, smaller/faster models, different LLM providers",
+        "Cost: calculate per-step cost (tokens + API calls) to find biggest contributors",
+        "Benchmarking often reveals most components are not material contributors"
+      ],
+      "min_points": 1,
+      "next_unit": "chapter9_unit7"
+    },
+    {
+      "id": "chapter9_unit7",
+      "lesson": 9,
+      "unit": "9.7",
+      "title": "The Development Process: Build and Analyse",
+      "material": "Building an agentic workflow is an iterative, non-linear cycle between two activities: building (writing code, improving components) and analysis (reading traces, running evals, error analysis). The cycle: (1) build a quick end-to-end prototype; (2) read traces to spot issues informally; (3) tune components or the overall system; (4) add a small eval dataset (10-20 examples); (5) do systematic error analysis with a spreadsheet; (6) build component-level evals for targeted improvement. Less experienced teams over-invest in building and under-invest in analysis — error analysis and evals are what directs effort productively. Custom evals are often necessary because agentic workflows are highly bespoke and off-the-shelf monitoring tools may not capture your specific failure modes.",
+      "question": "What are the two main activities in the agentic workflow development cycle, and what mistake do less experienced teams typically make?",
+      "key_points": [
+        "Two activities: building (code, components) and analysis (traces, evals, error analysis)",
+        "The cycle is non-linear — constantly switching between building and analysis",
+        "Less experienced teams over-build and under-analyse",
+        "Analysis (error analysis, evals) is what directs build effort productively",
+        "Custom evals often needed because workflows are bespoke"
+      ],
+      "min_points": 1,
+      "next_unit": null
+    }
+  ]
+}

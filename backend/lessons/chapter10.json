@@ -1,0 +1,89 @@
+{
+  "id": "chapter10",
+  "title": "Highly Autonomous Agents: Planning and Multi-Agent Systems",
+  "units": [
+    {
+      "id": "chapter10_unit1",
+      "lesson": 10,
+      "unit": "10.1",
+      "title": "Planning Workflows: LLM-Generated Step-by-Step Plans",
+      "material": "The planning design pattern allows an LLM to generate a step-by-step plan at runtime, then execute each step using available tools — without the developer hard-coding the sequence. Example: customer service agent asked 'show me round sunglasses under $100 in stock' generates a three-step plan: (1) get item descriptions to find round ones, (2) check inventory, (3) get item prices. Each step is executed sequentially with the output of each step fed into the next. Planning is already widely used in agentic coding tools. For other domains, adoption is growing but still experimental — a key challenge is that the developer cannot predict exactly what plan the LLM will generate at runtime, making the system harder to control.",
+      "question": "What is the main advantage of the planning design pattern, and what is its main limitation?",
+      "key_points": [
+        "LLM generates the sequence of steps at runtime — developer does not hard-code it",
+        "Handles a wider range of requests without code changes",
+        "Already works well in agentic coding tools",
+        "Main limitation: developer cannot predict the plan at runtime, making the system harder to control"
+      ],
+      "min_points": 1,
+      "next_unit": "chapter10_unit2"
+    },
+    {
+      "id": "chapter10_unit2",
+      "lesson": 10,
+      "unit": "10.2",
+      "title": "Creating and Executing LLM Plans: JSON and XML Formats",
+      "material": "When asking an LLM to generate a plan, the output format matters for reliable parsing. JSON is the most common format: the plan is a list of step objects, each with keys for step number, description, tool name, and arguments. This allows downstream code to unambiguously parse and execute each step. XML tags are an equally good alternative. Markdown is less reliable and plain text is the least reliable. By formatting plans in JSON or XML, code can systematically iterate through steps, call the right tool with the right arguments, and feed results into the next step.",
+      "question": "Why is JSON or XML preferred over plain text when an LLM generates a multi-step plan?",
+      "key_points": [
+        "JSON and XML allow downstream code to parse steps unambiguously",
+        "Each step has clear keys: description, tool name, arguments",
+        "Markdown is less reliable; plain text is least reliable",
+        "Structured format enables systematic step-by-step execution with correct tool calls"
+      ],
+      "min_points": 1,
+      "next_unit": "chapter10_unit3"
+    },
+    {
+      "id": "chapter10_unit3",
+      "lesson": 10,
+      "unit": "10.3",
+      "title": "Planning with Code Execution",
+      "material": "Instead of a JSON plan executed one tool call at a time, the LLM can express a plan as executable code. For data analysis tasks, rather than creating one custom tool per query (brittle and endless), the LLM writes Python code using libraries like pandas — which already contain hundreds of built-in functions the LLM has trained on. Example: 'which month had highest hot chocolate sales?' — LLM writes a multi-step pandas script. 'How many unique transactions last week?' — LLM writes another script. Research (Wang et al.) confirms: code-as-action > JSON plan > plain text plan across multiple models and tasks. Best current application: agentic coding tools where the LLM plans and executes software development tasks as a checklist. Same sandbox security caveat applies.",
+      "question": "Why is code a better format for expressing complex plans than JSON tool calls, according to research?",
+      "key_points": [
+        "Code gives access to hundreds of library functions the LLM already knows how to use",
+        "Avoids creating endless custom tools for every query type",
+        "Research shows code-as-action outperforms JSON plan which outperforms plain text",
+        "Best applied in agentic coding tools; still maturing in other domains",
+        "Sandbox security caveat still applies"
+      ],
+      "min_points": 2,
+      "next_unit": "chapter10_unit4"
+    },
+    {
+      "id": "chapter10_unit4",
+      "lesson": 10,
+      "unit": "10.4",
+      "title": "Multi-Agent Workflows",
+      "material": "A multi-agent workflow uses multiple specialised agents collaborating on a complex task. Analogy: just as a computer decomposes work into processes/threads, a complex task can be decomposed across agents with different roles. Marketing asset example: researcher (web search tool) + graphic designer (image gen + code execution) + writer (LLM only). Each agent is built by prompting an LLM to play a specific role. Two workflow structures: (1) linear — researcher → designer → writer, each passing output to the next; (2) manager-directed — a marketing manager agent receives the brief, delegates to researcher, designer, writer in turn, and reviews the final output. Agents can be reused across projects. The mental model: 'what team of people would I hire for this task?'",
+      "question": "What is the mental model Andrew Ng recommends for designing a multi-agent system, and give one example of how it works in practice?",
+      "key_points": [
+        "Mental model: what team of people with different roles would I hire for this task?",
+        "Each agent is an LLM prompted to play a specific role with relevant tools",
+        "Linear workflow: agents work sequentially, each passing output to the next",
+        "Manager-directed: a coordinating agent delegates to specialists and reviews output",
+        "Agents can be built once and reused across multiple applications"
+      ],
+      "min_points": 1,
+      "next_unit": "chapter10_unit5"
+    },
+    {
+      "id": "chapter10_unit5",
+      "lesson": 10,
+      "unit": "10.5",
+      "title": "Communication Patterns for Multi-Agent Systems",
+      "material": "Four communication patterns in multi-agent systems: (1) Linear — agents work sequentially, each passing output to the next; most predictable and controllable. (2) Hierarchical — a manager agent coordinates specialists; agents report back to manager rather than directly to each other; the second most common pattern. (3) Deep hierarchy — agents have their own sub-agents (e.g. researcher has web-researcher and fact-checker sub-agents); more complex, used less frequently. (4) All-to-all — any agent can message any other at any time; most flexible but hardest to predict; suitable only for applications that tolerate unpredictability. Software frameworks exist that implement these patterns. Choosing the right pattern is a key design decision when building multi-agent systems.",
+      "question": "Describe the four communication patterns for multi-agent systems and when you would choose each one.",
+      "key_points": [
+        "Linear: sequential, most predictable — use for well-defined ordered tasks",
+        "Hierarchical: manager coordinates team — use when one agent needs to orchestrate others",
+        "Deep hierarchy: agents have sub-agents — use for very complex decomposed tasks",
+        "All-to-all: any agent talks to any other — use only when unpredictability is acceptable",
+        "Frameworks exist to help implement each pattern"
+      ],
+      "min_points": 2,
+      "next_unit": null
+    }
+  ]
+}

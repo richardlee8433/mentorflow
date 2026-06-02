@@ -1,0 +1,88 @@
+{
+  "id": "chapter7",
+  "title": "Reflection Design Pattern",
+  "units": [
+    {
+      "id": "chapter7_unit1",
+      "lesson": 7,
+      "unit": "7.1",
+      "title": "Reflection to Improve Outputs",
+      "material": "Reflection is a design pattern where an LLM reviews and improves its own first draft in a second pass. Just as a human re-reads an email and catches typos or unclear dates before sending, an LLM can be prompted to critique its own output and produce an improved version. The workflow: (1) generate first draft, (2) pass draft to same or different LLM with a reflection prompt asking it to critique and rewrite. Different models have different strengths — reasoning models (also called thinking models) are particularly good at finding bugs in code. Reflection provides a modest but reliable performance bump across many tasks, but it is not magic and does not guarantee perfect output.",
+      "question": "Describe the basic reflection workflow and explain why you might use a different model for the reflection step than for the initial generation.",
+      "key_points": [
+        "Generate first draft, then pass to LLM with a reflection/critique prompt",
+        "Same or different model can be used for the reflection step",
+        "Reasoning/thinking models are better at finding bugs",
+        "Reflection gives a modest performance improvement, not a guarantee of perfection"
+      ],
+      "min_points": 1,
+      "next_unit": "chapter7_unit2"
+    },
+    {
+      "id": "chapter7_unit2",
+      "lesson": 7,
+      "unit": "7.2",
+      "title": "Reflection vs Direct Generation",
+      "material": "Direct generation (zero-shot prompting) means prompting an LLM once and taking its output. Zero-shot means zero examples in the prompt; one-shot or few-shot prompting includes example input-output pairs. Research (Madaan et al.) shows reflection consistently outperforms direct generation across a variety of tasks and models — dark bars in the study are systematically higher than light bars. Practical use cases where reflection helps: validating complex structured outputs (nested JSON, HTML), checking step-by-step instructions for completeness, filtering domain names for pronounceability and negative connotations. Tips for reflection prompts: (1) explicitly ask it to review/reflect on the draft, (2) specify clear criteria (tone, factual accuracy, word limit, pronounceability) to guide the critique.",
+      "question": "What does 'zero-shot prompting' mean, and what evidence suggests reflection outperforms it?",
+      "key_points": [
+        "Zero-shot: no examples in the prompt; model generates directly",
+        "Research shows reflection (dark bars) consistently beats zero-shot (light bars) across tasks",
+        "Reflection helps most with complex structured outputs and multi-step instructions",
+        "Effective reflection prompts specify clear criteria for the critique"
+      ],
+      "min_points": 1,
+      "next_unit": "chapter7_unit3"
+    },
+    {
+      "id": "chapter7_unit3",
+      "lesson": 7,
+      "unit": "7.3",
+      "title": "Chart Generation: Reflection on Visual Output",
+      "material": "Reflection can be applied to multimodal outputs, not just text. Example: LLM generates Python code to plot Q1 coffee sales 2024 vs 2025; first attempt produces a hard-to-read stacked bar chart. By feeding the generated code AND the resulting image to a multimodal LLM (one that accepts image input), you can ask it to visually critique the chart for readability, clarity, and appropriate chart type, then rewrite the code. The second version produces a cleaner grouped bar chart. Key insight: different LLMs suit different roles — use one for initial code generation (GPT-4o, GPT-5), another (possibly a reasoning model) for reflection. Specify criteria in the reflection prompt: readability, clarity, completeness.",
+      "question": "How does applying reflection to chart generation differ from applying it to text generation?",
+      "key_points": [
+        "Requires a multimodal LLM that can accept image input for the reflection step",
+        "The model visually critiques the chart, not just the code",
+        "Specify visual criteria: clear title, axis labels, appropriate chart type",
+        "Different models may be optimal for generation vs reflection steps"
+      ],
+      "min_points": 1,
+      "next_unit": "chapter7_unit4"
+    },
+    {
+      "id": "chapter7_unit4",
+      "lesson": 7,
+      "unit": "7.4",
+      "title": "Evaluating the Impact of Reflection",
+      "material": "Before committing to reflection (which adds latency), measure whether it actually improves your specific application. For objective tasks: build a ground truth dataset (10-15 prompts with known correct answers), run with and without reflection, compare accuracy. Example: SQL query generation without reflection = 87% correct; with reflection = 95%. For subjective tasks (e.g. chart quality): avoid asking LLM to compare two outputs side-by-side — LLMs have position bias (typically favouring the first option presented) and rankings often do not match human judgment. Better approach: grade with a rubric against a single output. Use 5 binary (0/1) criteria (clear title? axis labels present? appropriate chart type?) and sum the scores. Binary criteria give more consistent results than 1-5 scales. Once evals are in place, rapidly try different prompt variations and measure which improves the score.",
+      "question": "Why is asking an LLM to compare two outputs ('which is better?') unreliable, and what is the recommended alternative?",
+      "key_points": [
+        "LLMs have position bias — they tend to favour whichever option is presented first",
+        "Pairwise comparison rankings often do not match human expert judgment",
+        "Better: grade a single output against a rubric with binary (0/1) criteria",
+        "Binary criteria are better calibrated than 1-5 scale ratings",
+        "Objective tasks can use code-based evals with ground truth; subjective tasks use rubric-based LLM judge"
+      ],
+      "min_points": 2,
+      "next_unit": "chapter7_unit5"
+    },
+    {
+      "id": "chapter7_unit5",
+      "lesson": 7,
+      "unit": "7.5",
+      "title": "External Feedback Makes Reflection More Powerful",
+      "material": "Prompt engineering alone has diminishing returns — performance improves then plateaus. Adding reflection gives a bump. But the biggest gains come from external feedback: new information from outside the LLM injected into the reflection loop. Performance curve: direct generation plateaus → reflection bumps it up → external feedback lifts it significantly higher. Practical external feedback sources: (1) Code execution — run generated code, feed error messages back to LLM. (2) Pattern matching — regex to detect competitor names in output, feed finding back as critique input. (3) Web search / trusted sources — fact-check claims (e.g. when was Taj Mahal commissioned vs completed). (4) Word count tool — if output exceeds length limit, feed exact count back so LLM can try again. The pattern: write code/tool to extract a specific fact about the output, then feed that fact as input to the reflection step.",
+      "question": "Describe the performance curve progression from direct generation to reflection to external feedback, and give one example of an external feedback source.",
+      "key_points": [
+        "Direct generation: improves then plateaus with prompt tuning",
+        "Reflection: bumps performance higher",
+        "External feedback: lifts performance significantly beyond reflection alone",
+        "Examples: code execution errors, competitor name detection, web search fact-checking, word count",
+        "Pattern: tool extracts fact about output → feed fact as input to reflection LLM"
+      ],
+      "min_points": 2,
+      "next_unit": null
+    }
+  ]
+}

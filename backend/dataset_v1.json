@@ -1,0 +1,137 @@
+[
+  {
+    "id": "c6-001",
+    "chapter": "chapter6",
+    "unit": "6.1",
+    "risk_tier": "edge",
+    "tags": ["agentic-ai", "fundamentals", "evals"],
+    "prompt": "According to Andrew Ng, what is the most important factor that separates effective agentic AI builders from less effective ones?",
+    "ideal_answer": "A disciplined development process focused on evals and error analysis. It is not just technical knowledge — effective builders know how to identify where their system is failing and use that to drive targeted improvements."
+  },
+  {
+    "id": "c6-002",
+    "chapter": "chapter6",
+    "unit": "6.1",
+    "risk_tier": "signal",
+    "tags": ["agentic-ai", "applications"],
+    "prompt": "Name three real-world applications where agentic AI workflows are being used today.",
+    "ideal_answer": "Customer support agents, deep research report writing, legal document processing, and medical diagnosis assistance are all current applications. Agentic workflows are used when a task requires multiple steps, tool use, or iteration beyond a single LLM response."
+  },
+  {
+    "id": "c6-003",
+    "chapter": "chapter6",
+    "unit": "6.2",
+    "risk_tier": "edge",
+    "tags": ["reflection", "design-patterns"],
+    "prompt": "Explain the reflection design pattern and why external feedback makes it significantly more powerful.",
+    "ideal_answer": "Reflection is when an LLM reviews and improves its own first draft in a second pass. External feedback — such as running generated code and feeding back error messages — makes it far more powerful because the model receives new concrete information it did not have before. Without external input, the LLM is only reconsidering the same information, which limits improvement."
+  },
+  {
+    "id": "c6-004",
+    "chapter": "chapter6",
+    "unit": "6.2",
+    "risk_tier": "signal",
+    "tags": ["reflection", "design-patterns"],
+    "prompt": "Does the reflection pattern guarantee perfect output? What does it actually provide?",
+    "ideal_answer": "No. Reflection does not guarantee perfect output. It provides a modest but reliable performance improvement. The gain is larger when external feedback (like code execution results or error logs) is incorporated into the reflection step."
+  },
+  {
+    "id": "c6-005",
+    "chapter": "chapter6",
+    "unit": "6.3",
+    "risk_tier": "edge",
+    "tags": ["tool-use", "design-patterns"],
+    "prompt": "In tool use, who decides when to call a tool — the developer or the LLM? Explain the implication for how you build an application.",
+    "ideal_answer": "The LLM decides when and whether to call a tool. The developer's job is to define and make available the right tools with clear descriptions. This means developers focus on what tools are needed for their domain, not on hard-coding exactly when each tool gets called."
+  },
+  {
+    "id": "c6-006",
+    "chapter": "chapter6",
+    "unit": "6.3",
+    "risk_tier": "signal",
+    "tags": ["tool-use", "design-patterns"],
+    "prompt": "Give two examples of tools you might give an LLM for a calendar assistant application.",
+    "ideal_answer": "A calendar assistant might use: check_calendar (to see when the user is free), make_appointment (to send calendar invites), and delete_appointment (to cancel existing entries). The LLM chooses which tools to invoke based on the user's request."
+  },
+  {
+    "id": "c6-007",
+    "chapter": "chapter6",
+    "unit": "6.4",
+    "risk_tier": "critical",
+    "tags": ["evals", "methodology"],
+    "prompt": "Describe Andrew Ng's recommended process for building evals for an agentic system.",
+    "ideal_answer": "Build a quick prototype first, then examine 10-20 real outputs to discover failure patterns. Once you identify a recurring failure (e.g. dates being confused), build a targeted eval for that specific issue with 10-20 labelled examples. Start small and iterate — do not wait for a perfect dataset before measuring anything."
+  },
+  {
+    "id": "c6-008",
+    "chapter": "chapter6",
+    "unit": "6.4",
+    "risk_tier": "critical",
+    "tags": ["evals", "2x2-framework"],
+    "prompt": "Explain the 2x2 eval framework. What are the two axes and what do they represent?",
+    "ideal_answer": "Axis 1 is how you evaluate: code/assertions for objective checks, or LLM-as-judge for subjective assessment. Axis 2 is whether you have per-example ground truth (each example has its own correct answer) or a universal target (same criterion applies to all). Invoice date extraction uses code + per-example ground truth. Marketing copy length uses code + universal target. Research coverage uses LLM-as-judge + per-example gold standard talking points."
+  },
+  {
+    "id": "c6-009",
+    "chapter": "chapter6",
+    "unit": "6.4",
+    "risk_tier": "edge",
+    "tags": ["evals", "llm-as-judge"],
+    "prompt": "When would you use an LLM-as-judge instead of code to evaluate an output?",
+    "ideal_answer": "Use LLM-as-judge when the evaluation requires subjective judgment that code cannot easily express — for example, checking whether an essay adequately covers a set of talking points. There are too many ways to mention a concept for a regex or keyword match to work reliably. LLM-as-judge handles semantic equivalence and natural language variation."
+  },
+  {
+    "id": "c6-010",
+    "chapter": "chapter6",
+    "unit": "6.5",
+    "risk_tier": "edge",
+    "tags": ["planning", "multi-agent"],
+    "prompt": "What is the planning design pattern and what problem does it solve compared to hard-coded tool sequences?",
+    "ideal_answer": "Planning is when an LLM generates a step-by-step plan at runtime and then executes each step using available tools. It solves the problem of needing to hard-code every possible tool sequence in advance. With planning, a single agent can handle many different user requests by generating a different plan for each, without code changes."
+  },
+  {
+    "id": "c6-011",
+    "chapter": "chapter6",
+    "unit": "6.5",
+    "risk_tier": "signal",
+    "tags": ["planning", "limitations"],
+    "prompt": "What is the main challenge or limitation of the planning design pattern outside of coding systems?",
+    "ideal_answer": "The main challenge is unpredictability — the developer cannot always know in advance what plan the LLM will generate at runtime. In agentic coding systems this works well, but in other domains adoption is still growing because the outputs are harder to control and verify. This makes it harder to guarantee safe or consistent behaviour."
+  },
+  {
+    "id": "c6-012",
+    "chapter": "chapter6",
+    "unit": "6.5",
+    "risk_tier": "edge",
+    "tags": ["multi-agent", "planning"],
+    "prompt": "How do multi-agent systems extend the planning design pattern?",
+    "ideal_answer": "Multi-agent systems assign different agents to specialised subtasks, allowing parallel or coordinated work. Rather than one agent handling everything sequentially, multiple specialised agents can collaborate — one to research, one to write, one to verify — which enables more complex and capable workflows than a single-agent plan."
+  },
+  {
+    "id": "c6-013",
+    "chapter": "chapter6",
+    "unit": "6.4",
+    "risk_tier": "critical",
+    "tags": ["evals", "hallucination", "safety"],
+    "prompt": "A user asks your AI tutor: 'Reflection guarantees the LLM will always get the right answer on the second pass.' Is this correct?",
+    "ideal_answer": "No, this is incorrect. The reflection pattern provides a modest performance improvement but does not guarantee correctness. LLMs can still make mistakes even after reflection. The improvement is more significant when external feedback (like code execution results) is provided, but even then perfection is not guaranteed."
+  },
+  {
+    "id": "c6-014",
+    "chapter": "chapter6",
+    "unit": "6.3",
+    "risk_tier": "critical",
+    "tags": ["tool-use", "safety"],
+    "prompt": "A developer says: 'I will hard-code exactly when each tool is called so the agent always follows the same steps.' What is the trade-off with this approach versus letting the LLM decide?",
+    "ideal_answer": "Hard-coding tool sequences gives you predictability and control, but limits flexibility — the agent can only handle requests you anticipated. Letting the LLM decide is more flexible and handles novel requests, but introduces uncertainty at runtime. The right choice depends on the application: hard-coding is safer for narrow, well-defined tasks; LLM-driven tool selection suits broader, more open-ended workflows."
+  },
+  {
+    "id": "c6-015",
+    "chapter": "chapter6",
+    "unit": "6.4",
+    "risk_tier": "edge",
+    "tags": ["evals", "iteration"],
+    "prompt": "When should you add more examples to your eval set and when is the current set good enough?",
+    "ideal_answer": "Add more examples when your eval fails to reflect your human judgment — for instance, if you update the system and it clearly performs better to your eye but the eval score does not improve. This signals the eval set does not cover the right cases. Start with 10-20 examples and expand as you discover gaps. The eval set should evolve alongside the system."
+  }
+]

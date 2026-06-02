@@ -1,0 +1,90 @@
+{
+  "id": "chapter8",
+  "title": "Tool Use",
+  "units": [
+    {
+      "id": "chapter8_unit1",
+      "lesson": 8,
+      "unit": "8.1",
+      "title": "What are Tools and How Tool Use Works",
+      "material": "Tool use means allowing an LLM to request calls to external functions. The LLM cannot call functions directly — it generates a structured output signalling which function to call, the developer's code intercepts this, executes the function, and feeds the result back to the LLM. This loop continues until the LLM generates a final response. Crucially, the LLM decides whether to call any tool at all. Given 'what time is it?', it calls getCurrentTime. Given 'how much caffeine is in green tea?', it answers directly without calling any tool. A dashed box notation in diagrams indicates tools are available for the LLM to choose from, as distinct from hard-coded function calls.",
+      "question": "Why is it technically incorrect to say the LLM 'calls' a tool, and what actually happens?",
+      "key_points": [
+        "LLM generates a structured output requesting a function call — it does not call the function itself",
+        "Developer code intercepts the request, executes the function, and returns the result to the LLM",
+        "LLM decides whether to use any tool based on the task — tool use is not hard-coded",
+        "The loop continues until the LLM generates a final response"
+      ],
+      "min_points": 1,
+      "next_unit": "chapter8_unit2"
+    },
+    {
+      "id": "chapter8_unit2",
+      "lesson": 8,
+      "unit": "8.2",
+      "title": "Creating a Tool: How LLMs Request Function Calls",
+      "material": "Before modern LLMs were trained natively for tool use, developers had to tell the LLM via prompt: 'If you want to call getCurrentTime, output the text FUNCTION: getCurrentTime'. Developer code then scanned the output for this pattern, extracted the function name and arguments, called the function, and fed the result back to the LLM. With arguments, the prompt described the argument format, and the LLM generated 'FUNCTION: getCurrentTime Pacific/Auckland'. The five-step process: (1) provide tool description to LLM, (2) LLM generates structured output requesting the call, (3) developer code calls the function, (4) result is fed back to LLM, (5) LLM generates next step or final response. The LLM may request multiple tool calls in sequence.",
+      "question": "Describe the five-step process by which an LLM uses a tool.",
+      "key_points": [
+        "Step 1: Provide tool description to LLM (name, purpose, arguments)",
+        "Step 2: LLM outputs structured text requesting the function call",
+        "Step 3: Developer code detects request and calls the function",
+        "Step 4: Function output is fed back to LLM",
+        "Step 5: LLM generates next step or final response (may call another tool)"
+      ],
+      "min_points": 2,
+      "next_unit": "chapter8_unit3"
+    },
+    {
+      "id": "chapter8_unit3",
+      "lesson": 8,
+      "unit": "8.3",
+      "title": "Modern Tool Syntax and JSON Schema",
+      "material": "Modern LLMs are trained natively for tool use — no manual prompt engineering needed. Libraries like AI Suite (open source) handle the JSON schema generation automatically by reading the function's docstring. The API call passes: model, messages, tools (list of functions). Behind the scenes, the library generates a JSON schema describing the function name, description (from docstring), and parameter types. This schema is what is actually passed to the LLM so it knows when and how to call the tool. The max_turns parameter prevents infinite loops (LLM calling tool after tool indefinitely) — typically set to 5. When using AI Suite, the library handles calling the function and feeding results back; you don't need to write that code manually.",
+      "question": "How does a library like AI Suite know how to describe a tool to the LLM, and what does it generate?",
+      "key_points": [
+        "Reads the function's docstring to generate a description",
+        "Automatically generates a JSON schema with function name, description, and parameter types",
+        "JSON schema is passed to the LLM so it knows when and how to call the function",
+        "max_turns prevents infinite tool-call loops",
+        "Library handles calling the function and returning results — no manual code needed"
+      ],
+      "min_points": 1,
+      "next_unit": "chapter8_unit4"
+    },
+    {
+      "id": "chapter8_unit4",
+      "lesson": 8,
+      "unit": "8.4",
+      "title": "Code Execution: The Most Powerful Tool",
+      "material": "Code execution is a special tool that lets an LLM write code and have it executed. Instead of creating separate tools for every calculator function (add, subtract, multiply, square root, exponentiation...), you give the LLM one tool: 'write Python code and I will execute it'. The LLM generates code delimited by special tags, developer code extracts and runs it using Python's exec() function, and feeds the result back. Security risk: exec() runs arbitrary code — a real incident involved an agentic coder deleting *.py files in a project directory. Best practice: run LLM-generated code inside a sandbox environment (Docker, E2B) to prevent data loss, leakage, or system damage. Reflection applies here too: if code execution fails, feed the error message back to the LLM and let it revise.",
+      "question": "Why is code execution considered the most powerful tool to give an LLM, and what is the main security risk?",
+      "key_points": [
+        "One tool replaces hundreds of specialised calculator/function tools",
+        "LLM can solve arbitrary computation problems by writing code",
+        "Security risk: LLM-generated code can delete files or cause data loss",
+        "Best practice: run in a sandbox environment (Docker, E2B)",
+        "Combine with reflection: feed error messages back to LLM to self-correct"
+      ],
+      "min_points": 2,
+      "next_unit": "chapter8_unit5"
+    },
+    {
+      "id": "chapter8_unit5",
+      "lesson": 8,
+      "unit": "8.5",
+      "title": "MCP: Model Context Protocol",
+      "material": "MCP (Model Context Protocol) was proposed by Anthropic and adopted industry-wide as a standard for giving LLMs access to tools and data sources. The problem it solves: without MCP, every developer team building an application independently wraps Slack, GitHub, Google Drive, Postgres, etc. — M applications × N tools = M×N total work. MCP reduces this to M+N by standardising how applications (MCP clients) connect to tool/data providers (MCP servers). MCP servers expose resources (data) and tools (functions). Example: Claude Desktop connected to a GitHub MCP server can summarise READMEs or list pull requests via natural language, with the MCP server handling the GitHub API calls. Rapidly growing ecosystem of both clients and servers.",
+      "question": "What problem does MCP solve, and how does it reduce the total work done by the developer community?",
+      "key_points": [
+        "Without MCP: each team independently builds integrations — M apps × N tools = M×N work",
+        "MCP standardises the interface so integrations are built once and shared — M+N work",
+        "MCP clients: applications that consume tools/data (e.g. Claude Desktop)",
+        "MCP servers: providers that expose tools and data (e.g. GitHub, Slack, Google Drive)",
+        "Proposed by Anthropic, now adopted across the industry"
+      ],
+      "min_points": 2,
+      "next_unit": null
+    }
+  ]
+}

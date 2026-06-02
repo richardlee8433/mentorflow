@@ -26,6 +26,11 @@ LESSON_PROGRESSION = {
     "chapter2": "chapter3",
     "chapter3": "chapter4",
     "chapter4": "chapter5",
+    "chapter5": "chapter6",
+    "chapter6": "chapter7",
+    "chapter7": "chapter8",
+    "chapter8": "chapter9",
+    "chapter9": "chapter10",
 }
 
 # =========================
@@ -453,6 +458,16 @@ def core_chat(user_id: str, user_message: str) -> str:
         return start_lesson(user_id, "chapter4")
     if text in ["start chapter5", "start chapter 5"]:
         return start_lesson(user_id, "chapter5")
+    if text in ["start chapter6", "start chapter 6"]:
+        return start_lesson(user_id, "chapter6")
+    if text in ["start chapter7", "start chapter 7"]:
+        return start_lesson(user_id, "chapter7")
+    if text in ["start chapter8", "start chapter 8"]:
+        return start_lesson(user_id, "chapter8")
+    if text in ["start chapter9", "start chapter 9"]:
+        return start_lesson(user_id, "chapter9")
+    if text in ["start chapter10", "start chapter 10"]:
+        return start_lesson(user_id, "chapter10")
 
     if text in ["stop lesson", "exit lesson", "end lesson"]:
         s.update(

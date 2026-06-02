@@ -1,0 +1,120 @@
+{
+  "id": "chapter6",
+  "title": "Introduction to Agentic Workflows",
+  "units": [
+    {
+      "id": "chapter6_unit1",
+      "lesson": 6,
+      "unit": "6.1",
+      "title": "What is Agentic AI?",
+      "material": "An agentic AI workflow is a process where an LLM-based app executes multiple steps to complete a task, rather than generating a single response. Think of the difference between asking someone to type an essay from the first word to the last without backspace — versus a person who outlines, researches, drafts, reflects, and revises. Agentic workflows follow the second approach: plan, search, write, reflect, revise. This iterative process takes longer but delivers significantly better output. A running example in this course is a research agent that plans research queries, calls a web search engine, downloads pages, synthesises findings, drafts an outline, has an editor-agent review for coherence, and generates a comprehensive report — far more thoughtful than a single prompt.",
+      "question": "What is the core difference between a non-agentic LLM call and an agentic workflow?",
+      "key_points": [
+        "Non-agentic: single prompt, single response, no iteration",
+        "Agentic: multiple steps executed sequentially or in parallel",
+        "Agentic workflows can plan, use tools, reflect, and revise",
+        "Output quality is significantly higher but takes more time"
+      ],
+      "min_points": 1,
+      "next_unit": "chapter6_unit2"
+    },
+    {
+      "id": "chapter6_unit2",
+      "lesson": 6,
+      "unit": "6.2",
+      "title": "Degrees of Autonomy",
+      "material": "Agentic systems exist on a spectrum from less to more autonomous — not a binary 'agent or not.' Andrew Ng introduced the term 'agentic' as an adjective to move past this debate. A less autonomous agent has all steps predetermined by the developer: call web search, fetch pages, write essay — hard-coded in sequence. A more autonomous agent lets the LLM decide: should it search the web, search news, or search research papers? How many pages to fetch? Whether to reflect? At the highly autonomous end, agents can even write new tools and functions at runtime. In between are semi-autonomous agents that can choose from predefined tools but follow a largely fixed structure. Less autonomous = more predictable and controllable. More autonomous = more flexible but harder to control.",
+      "question": "Why did Andrew Ng introduce the term 'agentic' instead of using 'agent', and what does the spectrum of autonomy mean in practice?",
+      "key_points": [
+        "'Agentic' is an adjective describing a degree, not a binary classification",
+        "Less autonomous: all steps hard-coded by the developer in advance",
+        "More autonomous: LLM decides sequence of steps at runtime",
+        "Higher autonomy = more flexible but less predictable and controllable"
+      ],
+      "min_points": 1,
+      "next_unit": "chapter6_unit3"
+    },
+    {
+      "id": "chapter6_unit3",
+      "lesson": 6,
+      "unit": "6.3",
+      "title": "Benefits of Agentic AI",
+      "material": "The biggest benefit of agentic workflows is enabling tasks that were previously impossible. On the HumanEval coding benchmark, GPT-3.5 with direct generation scored 40%; GPT-4 scored 67% — a large jump. But GPT-3.5 wrapped in an agentic workflow (reflect, iterate, improve) significantly outperformed even GPT-4 direct generation. The improvement from adding an agentic workflow to an older model exceeded the improvement from upgrading model generations. Two additional benefits: (1) Parallelism — an agentic workflow can run multiple web searches and download 9 pages simultaneously, whereas a human reads them one by one. (2) Modularity — you can swap out individual components: try a different web search engine (Google, Bing, Tavily), add a news search for recency, or use a different LLM for each step based on its strengths.",
+      "question": "According to Andrew Ng's HumanEval data, how does wrapping GPT-3.5 in an agentic workflow compare to using GPT-4 directly?",
+      "key_points": [
+        "GPT-3.5 direct: 40%, GPT-4 direct: 67% on HumanEval",
+        "GPT-3.5 in agentic workflow outperforms GPT-4 direct generation",
+        "Model upgrade gain is smaller than agentic workflow gain on older model",
+        "Parallelism: agentic workflows can process multiple sources simultaneously",
+        "Modularity: individual components (LLM, search engine, tools) can be swapped"
+      ],
+      "min_points": 2,
+      "next_unit": "chapter6_unit4"
+    },
+    {
+      "id": "chapter6_unit4",
+      "lesson": 6,
+      "unit": "6.4",
+      "title": "Agentic AI Applications and What Makes Tasks Easy or Hard",
+      "material": "Agentic workflows are being deployed across many domains. Invoice processing: PDF → text → extract fields (biller, amount, due date) → update database. Customer order inquiry: extract order details → query database → draft response → human review queue. More advanced: a general customer service agent that must plan its own sequence of database calls depending on the question asked. Most experimental: computer use agents that browse the web and click UI elements autonomously — exciting but still unreliable for mission-critical tasks. What makes tasks easier: clear step-by-step process exists, text-only inputs, steps known in advance. What makes tasks harder: steps not known in advance (agent must plan as it goes), rich multimodal inputs (audio, video), need to interact with live UIs.",
+      "question": "What are two characteristics that make an agentic workflow easier to implement reliably?",
+      "key_points": [
+        "Clear step-by-step process defined in advance",
+        "Text-only inputs (LLMs are optimised for text)",
+        "Steps are known before the task starts",
+        "Tasks harder when agent must plan steps dynamically or handle multimodal inputs"
+      ],
+      "min_points": 1,
+      "next_unit": "chapter6_unit5"
+    },
+    {
+      "id": "chapter6_unit5",
+      "lesson": 6,
+      "unit": "6.5",
+      "title": "Task Decomposition",
+      "material": "Task decomposition is the skill of breaking a complex goal into discrete steps that can each be executed by an LLM or a tool. The key question for each step: can this be done by an LLM, a function call, or a short piece of code? For a research essay: (1) write outline → LLM; (2) generate search terms and search web → LLM + web search tool; (3) write first draft → LLM. If the result is disjointed, decompose further: (3a) write first draft, (3b) identify parts needing revision, (3c) revise draft. Building blocks available: LLMs (text generation, extraction, decision-making), specialised AI models (PDF-to-text, speech, image analysis), software tools (web search APIs, database queries, email/calendar, RAG retrieval, code execution). If a step seems too hard to implement, ask: how would a human do this sub-step? Can it be broken down further?",
+      "question": "When decomposing a task into steps for an agentic workflow, what is the key question to ask about each individual step?",
+      "key_points": [
+        "Can this step be done by an LLM, a function call, or a short piece of code?",
+        "If not, decompose further until each step is implementable",
+        "Building blocks: LLMs, specialised AI models, software tools, RAG, code execution",
+        "Start simple, then iterate — decompose further when output quality is insufficient"
+      ],
+      "min_points": 1,
+      "next_unit": "chapter6_unit6"
+    },
+    {
+      "id": "chapter6_unit6",
+      "lesson": 6,
+      "unit": "6.6",
+      "title": "Evaluating Agentic AI Workflows",
+      "material": "The ability to run disciplined evals is one of the biggest predictors of whether a developer builds agentic workflows effectively. Best practice: build first, then examine 10-20 outputs manually to discover what is not satisfactory — because many failure modes are impossible to anticipate in advance. Example: a customer order agent unexpectedly mentions competitors ('Unlike RivalCo, we make returns easy'). This failure would be hard to predict upfront. Once discovered, build a targeted eval: write code to count how often competitor names appear in outputs — this is an objective metric. For subjective quality (e.g. essay quality), use LLM-as-judge to assign scores. Note: 1-5 scale ratings from LLMs are not reliable; better techniques exist (covered in Module 4). Two eval types: end-to-end evals (measure overall output quality) and component-level evals (measure quality of a single step). Error analysis — reading intermediate outputs (traces) — is equally important.",
+      "question": "Why is it better to build an agentic system first and then design evals, rather than designing evals upfront?",
+      "key_points": [
+        "Many failure modes are impossible to anticipate before seeing real outputs",
+        "Examining outputs reveals the actual problems worth measuring",
+        "Objective failures (competitor mentions) can be measured with code",
+        "Subjective quality requires LLM-as-judge",
+        "Both end-to-end and component-level evals are needed"
+      ],
+      "min_points": 2,
+      "next_unit": "chapter6_unit7"
+    },
+    {
+      "id": "chapter6_unit7",
+      "lesson": 6,
+      "unit": "6.7",
+      "title": "The Four Agentic Design Patterns",
+      "material": "Four key design patterns underpin most agentic workflows: (1) Reflection — LLM reviews and improves its own output; can also use a separate critique agent; more powerful when external feedback (e.g. code execution errors) is included. (2) Tool Use — LLMs are given functions they can call to get information or take action (web search, code execution, email, calendar, databases); the LLM decides when to call which tool. (3) Planning — LLM decides the sequence of steps needed at runtime rather than having the developer hard-code the sequence; used in HuggingGPT and similar systems; more experimental and harder to control. (4) Multi-Agent Collaboration — multiple specialised agents (researcher, writer, editor; or CEO, programmer, tester) work together on a complex task; shown to improve outcomes on tasks like biography writing; harder to control but powerful for complex workflows.",
+      "question": "Name the four agentic design patterns and give a one-sentence description of each.",
+      "key_points": [
+        "Reflection: LLM reviews and improves its own output, optionally using external feedback",
+        "Tool Use: LLM calls functions (web search, code execution, APIs) as needed",
+        "Planning: LLM determines the sequence of steps at runtime rather than following hard-coded flow",
+        "Multi-Agent: multiple specialised agents collaborate to complete a complex task"
+      ],
+      "min_points": 2,
+      "next_unit": null
+    }
+  ]
+}
