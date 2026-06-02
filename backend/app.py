@@ -80,6 +80,7 @@ def get_session(user_id: str) -> Dict[str, Any]:
             "current_unit_id": None,
             "correct_in_lesson": 0,
             "unlocked_lessons": ["chapter1"],  # v0.8+ curriculum style
+            "active_chapter": "",  # chapter pinned for reflection key_points
             # role-play
             "roleplay_node": None,
             "roleplay_score": 0,
@@ -456,11 +457,23 @@ REFLECTION_SYSTEM_PROMPT = (
 )
 
 
-def mentor_chat_with_reflection(user_message: str) -> str:
+def get_chapter_key_points(chapter_id: str) -> List[str]:
+    """Return all key_points from every unit in a chapter. Empty list if not found."""
+    lesson = LESSONS.get(chapter_id)
+    if not lesson:
+        return []
+    points: List[str] = []
+    for unit in lesson.get("units", []):
+        points.extend(unit.get("key_points", []))
+    return points
+
+
+def mentor_chat_with_reflection(user_message: str, chapter_id: str = "") -> str:
     """
-    Two-pass reflection pipeline:
+    Two-pass reflection pipeline with optional external key_points feedback.
     Pass 1 — generate initial answer (draft)
-    Pass 2 — critique and rewrite the draft (reflection)
+    Pass 2 — critique against key_points standard (if chapter_id provided)
+              or general quality review (if no chapter_id)
     Returns the improved response.
     """
     # Pass 1: generate draft
@@ -474,7 +487,20 @@ def mentor_chat_with_reflection(user_message: str) -> str:
     )
     draft = (draft_res.choices[0].message.content or "").strip()
 
-    # Pass 2: reflect and improve
+    # Build external feedback for Pass 2
+    key_points = get_chapter_key_points(chapter_id) if chapter_id else []
+
+    if key_points:
+        kp_text = "\n".join(f"- {kp}" for kp in key_points)
+        external_feedback = (
+            f"[Key concepts this chapter covers]\n{kp_text}\n\n"
+            "Check if the draft response covers the relevant key concepts above. "
+            "If any important ones are missing or explained incorrectly, fix them."
+        )
+    else:
+        external_feedback = "Improve this response for accuracy, clarity, and completeness."
+
+    # Pass 2: reflect with external standard
     reflection_res = client.chat.completions.create(
         model="gpt-4.1-mini",
         messages=[
@@ -484,7 +510,7 @@ def mentor_chat_with_reflection(user_message: str) -> str:
                 "content": (
                     f"[Original question]\n{user_message}\n\n"
                     f"[Draft response]\n{draft}\n\n"
-                    "Improve this response."
+                    f"{external_feedback}"
                 ),
             },
         ],
@@ -547,7 +573,8 @@ def core_chat(user_id: str, user_message: str) -> str:
         return continue_lesson(user_id, user_message)
 
     # Default general chat — with reflection
-    return mentor_chat_with_reflection(user_message)
+    chapter_id = s.get("active_chapter", "")
+    return mentor_chat_with_reflection(user_message, chapter_id=chapter_id)
 
 
 # =========================
@@ -557,6 +584,7 @@ def core_chat(user_id: str, user_message: str) -> str:
 class ChatRequest(BaseModel):
     user_id: str
     message: str
+    chapter_id: str = ""  # optional: pin chat to a chapter for key_points feedback
 
 
 class ChatResponse(BaseModel):
@@ -566,6 +594,10 @@ class ChatResponse(BaseModel):
 
 @app.post("/chat", response_model=ChatResponse)
 def chat_endpoint(req: ChatRequest):
+    # store active_chapter in session so reflection knows which key_points to use
+    if req.chapter_id:
+        s = get_session(req.user_id)
+        s["active_chapter"] = req.chapter_id
     reply = core_chat(req.user_id, req.message)
 
     # strip HTML for speech
@@ -581,6 +613,19 @@ def chat_endpoint(req: ChatRequest):
 @app.get("/")
 def root():
     return {"status": "ok", "message": "MentorFlow v0.92 Teaching API running"}
+
+
+@app.get("/chapters")
+def chapters_endpoint():
+    """Return all chapters with id, title, and unit count for the frontend selector."""
+    result = []
+    for chapter_id, lesson in LESSONS.items():
+        result.append({
+            "id": chapter_id,
+            "title": lesson.get("title", chapter_id),
+            "unit_count": len(lesson.get("units", [])),
+        })
+    return {"chapters": result}
 
 
 class ReportRequest(BaseModel):

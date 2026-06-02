@@ -34,6 +34,12 @@ type ApiResponse = {
 
 type BackendStatus = "unknown" | "ok" | "error";
 
+type Chapter = {
+  id: string;
+  title: string;
+  unit_count: number;
+};
+
 function usePersistentUserId(key: string): string {
   const [userId] = useState(
     () => {
@@ -70,6 +76,8 @@ function App() {
   const [region, setRegion] = useState("EU-1");
   const [uploading, setUploading] = useState(false);
   const [adminDocsInfo, setAdminDocsInfo] = useState<string | null>(null);
+  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [selectedChapter, setSelectedChapter] = useState<string>("");
 
   const backendLabel = useMemo(() => {
     if (backendStatus === "ok") return "backend: online";
@@ -104,6 +112,19 @@ function App() {
   }, [backendBase]);
 
   useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`${backendBase}/chapters`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setChapters(data.chapters ?? []);
+      } catch {
+        // chapters will just be empty — no crash
+      }
+    })();
+  }, [backendBase]);
+
+  useEffect(() => {
     if (!ttsEnabled && speaking) {
       window.speechSynthesis.cancel();
       setSpeaking(false);
@@ -133,6 +154,7 @@ function App() {
         message,
         rag_enabled: ragEnabled,
         region,
+        chapter_id: selectedChapter,
       }),
     });
 
@@ -352,53 +374,76 @@ function App() {
             )}
           </div>
 
-          {/* Quick commands row */}
-          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-600">
-            <span className="font-semibold text-slate-700">Quick commands:</span>
-            <Button
-              variant="outline"
-              size="xs"
-              onClick={() => handleQuickCommand("start lecture 1")}
+          {/* Chapter selector */}
+          <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-slate-700">Select a chapter</span>
+              <div className="flex gap-1">
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  className="text-slate-500 hover:text-slate-900"
+                  onClick={() => handleQuickCommand("stop lesson")}
+                >
+                  stop lesson
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  className="text-slate-500 hover:text-slate-900"
+                  onClick={handleClear}
+                >
+                  clear chat
+                </Button>
+              </div>
+            </div>
+            <select
+              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400"
+              value={selectedChapter}
+              onChange={(e) => setSelectedChapter(e.target.value)}
             >
-              start lecture 1
-            </Button>
-            <Button
-              variant="outline"
-              size="xs"
-              onClick={() => handleQuickCommand("start lesson 1")}
-            >
-              start lesson 1
-            </Button>
-            <Button
-              variant="outline"
-              size="xs"
-              onClick={() => handleQuickCommand("start lecture 2")}
-            >
-              start lecture 2
-            </Button>
-            <Button
-              variant="outline"
-              size="xs"
-              onClick={() => handleQuickCommand("start roleplay")}
-            >
-              start roleplay
-            </Button>
-            <Button
-              variant="ghost"
-              size="xs"
-              className="ml-auto text-slate-500 hover:text-slate-900"
-              onClick={() => handleQuickCommand("stop lesson")}
-            >
-              stop lesson
-            </Button>
-            <Button
-              variant="ghost"
-              size="xs"
-              className="text-slate-500 hover:text-slate-900"
-              onClick={handleClear}
-            >
-              Clear chat
-            </Button>
+              <option value="">— choose a chapter —</option>
+              {chapters.map((ch, i) => (
+                <option key={ch.id} value={ch.id}>
+                  Ch {i + 1}: {ch.title} ({ch.unit_count} units)
+                </option>
+              ))}
+            </select>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="xs"
+                className="flex-1"
+                disabled={!selectedChapter}
+                onClick={() => {
+                  if (!selectedChapter) return;
+                  const n = selectedChapter.replace("chapter", "");
+                  handleQuickCommand(`start chapter${n}`);
+                }}
+              >
+                📘 Start Lesson
+              </Button>
+              <Button
+                variant="outline"
+                size="xs"
+                className="flex-1"
+                disabled={!selectedChapter}
+                onClick={() => {
+                  if (!selectedChapter) return;
+                  const ch = chapters.find((c) => c.id === selectedChapter);
+                  setInput(`Tell me about: ${ch?.title ?? selectedChapter}`);
+                }}
+              >
+                💬 Chat about this chapter
+              </Button>
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={() => handleQuickCommand("start roleplay")}
+              >
+                🎭 Roleplay
+              </Button>
+            </div>
           </div>
 
           {/* Input row */}
@@ -461,8 +506,8 @@ function App() {
             What can I learn here?
           </CardTitle>
           <CardDescription className="text-xs">
-            v0.8 focuses on lesson flow &amp; podcast-style lectures. v0.7 RAG
-            upload remains available in the Admin tab.
+            10 chapters covering AI PM fundamentals through Agentic AI design patterns.
+            Select a chapter to start a lesson or ask questions.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-1 flex-col gap-3 pt-0">
@@ -517,17 +562,10 @@ function App() {
               Tips
             </p>
             <ul className="list-disc pl-4 space-y-1 text-[11px] text-slate-600">
-              <li>Use quick commands to start a lesson or role-play.</li>
-              <li>
-                In lecture mode, type <code>next</code> to hear the next part,
-                or <code>stop lesson</code> to exit.
-              </li>
-              <li>
-                Ask for explanations, comparisons, and step-by-step reasoning.
-              </li>
-              <li>
-                In Admin tab, upload documents to power RAG-based answers.
-              </li>
+              <li>Select a chapter, then click <strong>Start Lesson</strong> for guided Q&amp;A.</li>
+              <li>Click <strong>Chat about this chapter</strong> to ask free-form questions — answers are checked against the chapter's key concepts.</li>
+              <li>Type <code>stop lesson</code> to return to chat mode at any time.</li>
+              <li>Chapters 1–5: AI PM fundamentals. Chapters 6–10: Agentic AI (Andrew Ng).</li>
             </ul>
           </div>
         </CardContent>
