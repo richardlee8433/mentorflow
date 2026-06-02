@@ -79,7 +79,7 @@ def get_session(user_id: str) -> Dict[str, Any]:
             "current_lesson": None,
             "current_unit_id": None,
             "correct_in_lesson": 0,
-            "unlocked_lessons": ["chapter1"],  # v0.8+ curriculum style
+            "unlocked_lessons": [f"chapter{i}" for i in range(1, 11)],  # all chapters unlocked
             "active_chapter": "",  # chapter pinned for reflection key_points
             # role-play
             "roleplay_node": None,
