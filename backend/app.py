@@ -436,6 +436,65 @@ def handle_roleplay(user_id: str, user_message: str) -> str:
 
 
 # =========================
+# Mentor reflection pipeline
+# =========================
+
+MENTOR_SYSTEM_PROMPT = (
+    "You are MentorFlow, an expert AI Product Management tutor. "
+    "Answer the learner's question clearly and concisely. "
+    "Focus on practical understanding. Do not invent facts."
+)
+
+REFLECTION_SYSTEM_PROMPT = (
+    "You are a senior AI PM educator reviewing a tutor's draft response. "
+    "Your job is to improve it — not praise it. "
+    "Check for: (1) accuracy — any incorrect or missing key concepts? "
+    "(2) clarity — is the explanation easy for a learner to follow? "
+    "(3) completeness — are important points missing? "
+    "Then rewrite the response to fix any issues found. "
+    "Output ONLY the improved response, no meta-commentary."
+)
+
+
+def mentor_chat_with_reflection(user_message: str) -> str:
+    """
+    Two-pass reflection pipeline:
+    Pass 1 — generate initial answer (draft)
+    Pass 2 — critique and rewrite the draft (reflection)
+    Returns the improved response.
+    """
+    # Pass 1: generate draft
+    draft_res = client.chat.completions.create(
+        model="gpt-4.1-mini",
+        messages=[
+            {"role": "system", "content": MENTOR_SYSTEM_PROMPT},
+            {"role": "user", "content": user_message},
+        ],
+        temperature=0.4,
+    )
+    draft = (draft_res.choices[0].message.content or "").strip()
+
+    # Pass 2: reflect and improve
+    reflection_res = client.chat.completions.create(
+        model="gpt-4.1-mini",
+        messages=[
+            {"role": "system", "content": REFLECTION_SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": (
+                    f"[Original question]\n{user_message}\n\n"
+                    f"[Draft response]\n{draft}\n\n"
+                    "Improve this response."
+                ),
+            },
+        ],
+        temperature=0.2,
+    )
+    improved = (reflection_res.choices[0].message.content or "").strip()
+    return improved if improved else draft
+
+
+# =========================
 # Core chat router
 # =========================
 
@@ -487,15 +546,8 @@ def core_chat(user_id: str, user_message: str) -> str:
     if s["mode"] == "lesson":
         return continue_lesson(user_id, user_message)
 
-    # Default general chat
-    res = client.chat.completions.create(
-        model="gpt-4.1-mini",
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": user_message},
-        ],
-    )
-    return res.choices[0].message.content or ""
+    # Default general chat — with reflection
+    return mentor_chat_with_reflection(user_message)
 
 
 # =========================
