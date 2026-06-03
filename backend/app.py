@@ -562,6 +562,7 @@ def core_chat(user_id: str, user_message: str) -> str:
                 "current_lesson": None,
                 "current_unit_id": None,
                 "correct_in_lesson": 0,
+                "active_chapter": "",
             }
         )
         return "🛑 Lesson mode ended. Back to general Q&A."

@@ -312,9 +312,14 @@ function App() {
             </span>
           )}
         </div>
-        <div className={isUser ? userBubble : assistantBubble}>
-          {msg.content}
-        </div>
+        {isUser ? (
+          <div className={userBubble}>{msg.content}</div>
+        ) : (
+          <div
+            className={assistantBubble}
+            dangerouslySetInnerHTML={{ __html: msg.content }}
+          />
+        )}
       </div>
     );
   }
